@@ -1,33 +1,30 @@
-const { exec } = require("child_process");
+const activeWin = require("active-win");
 
-function getActiveWindow() {
-  return new Promise((resolve) => {
-    const platform = process.platform;
+let lastApp = "";
+let lastTitle = "";
 
-    if (platform === "linux") {
-      // Your existing Linux command
-      exec("xdotool getactivewindow getwindowname", (err, stdout) => {
-        resolve(stdout ? stdout.trim().toLowerCase() : "Desktop / Idle");
-      });
-    } 
-    else if (platform === "win32") {
-      // Windows command (using PowerShell)
-      const powershellCmd = 'powershell "Get-Process | Where-Object {$_.mainWindowTitle} | Select-Object -ExpandProperty mainWindowTitle | Select-Object -Last 1"';
-      exec(powershellCmd, (err, stdout) => {
-        resolve(stdout ? stdout.trim() : "Windows Desktop");
-      });
-    } 
-    else if (platform === "darwin") {
-      // macOS command (using AppleScript)
-      const appleScript = 'osascript -e "tell application \\"System Events\\" to get name of first process whose frontmost is true"';
-      exec(appleScript, (err, stdout) => {
-        resolve(stdout ? stdout.trim() : "macOS Desktop");
-      });
-    } 
-    else {
-      resolve("Unknown Platform");
+async function trackWindow() {
+  try {
+    const win = await activeWin();
+
+    if (!win) return;
+
+    const currentApp = win.owner.name;
+    const currentTitle = win.title;
+
+    // Only log if something changed (prevents spam)
+    if (currentApp !== lastApp || currentTitle !== lastTitle) {
+      console.log("App:", currentApp);
+      console.log("Title:", currentTitle);
+      console.log("----------------------");
+
+      lastApp = currentApp;
+      lastTitle = currentTitle;
     }
-  });
+  } catch (err) {
+    console.error("Tracker error:", err);
+  }
 }
 
-module.exports = { getActiveWindow };
+// Run every 1 second
+setInterval(trackWindow, 1000);
