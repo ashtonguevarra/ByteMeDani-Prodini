@@ -7,7 +7,7 @@ function getActiveWindow() {
     if (platform === "linux") {
       // Your existing Linux command
       exec("xdotool getactivewindow getwindowname", (err, stdout) => {
-        resolve(stdout ? stdout.trim() : "Desktop / Idle");
+        resolve(stdout ? stdout.trim().toLowerCase() : "Desktop / Idle");
       });
     } 
     else if (platform === "win32") {

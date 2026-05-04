@@ -7,6 +7,7 @@ let win;
 let lastWindow = "";
 let history = [];
 
+let trackingStarted = false;
 function createWindow() {
   win = new BrowserWindow({
     width: 900,
@@ -17,6 +18,21 @@ function createWindow() {
   });
 
   win.loadFile("index.html");
+
+
+win.on("closed", () => {
+  win = null;
+});
+
+  win.webContents.on("did-finish-load", () => {
+    console.log("Window loaded");
+
+
+    if (!trackingStarted) {
+      startTracking();
+      trackingStarted = true;
+    }
+  });
 }
 
 function logToFile(entry) {
@@ -25,7 +41,7 @@ function logToFile(entry) {
 
 async function startTracking() {
   setInterval(async () => {
-    const currentWindow = await getActiveWindow();
+    const currentWindow = (await getActiveWindow()).toLowerCase().trim();
 
     if (currentWindow !== lastWindow) {
       const entry = {
@@ -36,18 +52,27 @@ async function startTracking() {
       history.push(entry);
       logToFile(entry);
 
-      // Send to UI
-      win.webContents.send("activity-update", {
-        current: currentWindow,
-        history: history.slice(-10)
-      });
+            
+        if (win && win.webContents) {
+            console.log("WIN STATUS:", win);
+        win.webContents.send("activity-update", {
+            current: currentWindow,
+            history: history.slice(-10)
+        });
+        }
 
-      lastWindow = currentWindow;
-    }
+  lastWindow = currentWindow;
+}
   }, 1000);
 }
 
 app.whenReady().then(() => {
   createWindow();
-  startTracking();
 });
+
+if (win && !win.isDestroyed() && win.webContents) {
+  win.webContents.send("activity-update", {
+    current: currentWindow,
+    history: history.slice(-10)
+  });
+}

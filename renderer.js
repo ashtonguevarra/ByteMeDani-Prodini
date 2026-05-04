@@ -8,7 +8,11 @@ window.api.onUpdate((data) => {
 
   data.history.forEach(entry => {
     const div = document.createElement("div");
-    div.textContent = `${entry.timestamp} - ${entry.window}`;
+    div.className = "log-entry";
+
+    const time = new Date(entry.timestamp).toLocaleTimeString();
+    div.textContent = `[${time}] - ${entry.window}`;
     logEl.appendChild(div);
   });
 });
+

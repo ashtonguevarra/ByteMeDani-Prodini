@@ -1,0 +1,49 @@
+#log {
+    /* 1. Essential: Fix the height of the box */
+    height: 200px; 
+    max-height: 200px;
+    
+    /* 2. Essential: Force vertical scrolling */
+    overflow-y: scroll; /* 'scroll' forces the bar to show even if empty */
+    overflow-x: hidden; /* prevents horizontal shifting */
+
+    /* 3. Styling so you can see the box clearly */
+    background-color: #e3e5eb;
+    border: 2px solid #88c0d0; /* A bright border to verify where the box is */
+    padding: 10px;
+    margin-top: 10px;
+}
+
+/* Let's make the scrollbar itself very obvious */
+#log::-webkit-scrollbar {
+    width: 12px;
+    display: block;
+}
+
+#log::-webkit-scrollbar-track {
+    background: #d7dbe2;
+}
+
+#log::-webkit-scrollbar-thumb {
+    background-color: #88c0d0; 
+    border-radius: 6px;
+    border: 3px solid #2e3440;
+}
+
+/* Styling the individual log entries */
+.log-entry {
+    padding: 5px 0;
+    border-bottom: 1px solid #434c5e;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+/* Optional: Make the scrollbar look nice (Nord/Dark theme style) */
+#log::-webkit-scrollbar {
+    width: 8px;
+}
+#log::-webkit-scrollbar-thumb {
+    background: #88c0d0;
+    border-radius: 10px;
+}
+
