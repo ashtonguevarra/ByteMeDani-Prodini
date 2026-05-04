@@ -6,8 +6,8 @@ const fs = require("fs");
 let win;
 let lastWindow = "";
 let history = [];
-
 let trackingStarted = false;
+
 function createWindow() {
   win = new BrowserWindow({
     width: 900,
@@ -17,16 +17,14 @@ function createWindow() {
     }
   });
 
-  win.loadFile("index.html");
+  win.loadFile(path.join(__dirname, "/index.html"));
 
-
-win.on("closed", () => {
-  win = null;
-});
+  win.on("closed", () => {
+    win = null;
+  });
 
   win.webContents.on("did-finish-load", () => {
     console.log("Window loaded");
-
 
     if (!trackingStarted) {
       startTracking();
@@ -52,27 +50,16 @@ async function startTracking() {
       history.push(entry);
       logToFile(entry);
 
-            
-        if (win && win.webContents) {
-            console.log("WIN STATUS:", win);
+      if (win && win.webContents) {
         win.webContents.send("activity-update", {
-            current: currentWindow,
-            history: history.slice(-10)
+          current: currentWindow,
+          history: history.slice(-10)
         });
-        }
+      }
 
-  lastWindow = currentWindow;
-}
+      lastWindow = currentWindow;
+    }
   }, 1000);
 }
 
-app.whenReady().then(() => {
-  createWindow();
-});
-
-if (win && !win.isDestroyed() && win.webContents) {
-  win.webContents.send("activity-update", {
-    current: currentWindow,
-    history: history.slice(-10)
-  });
-}
+app.whenReady().then(createWindow); 

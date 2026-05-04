@@ -1,17 +1,22 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Activity Tracker</title>
-  <link rel="stylesheet" href = "style.css">
-</head>
 <body>
+  <div class="container">
+
+<div class="current-box">
   <h2>Current Focus</h2>
-  <div id="current">Initializing...</div>
+  <div id="current"></div>
+</div>
 
-  <h3>Recent Activity</h3>
+<div class="history-box">
+  <h3>Recent Activity (Live)</h3>
+  <div id="history"></div>
+</div>
+
+<div class="log-box">
+  <h3>Saved Logs (Database)</h3>
   <div id="log"></div>
+</div>
 
+  </div>
 
   <script src="renderer.js"></script>
 </body>
-</html>
