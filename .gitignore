@@ -1,2 +1,6 @@
 node_modules/
 activity.log
+savelogtest.sh
+genssh.sh
+backend/venv
+backend/instance
