@@ -18,8 +18,7 @@
         </div>
         <nav class="sidebar-nav">
           <button class="nav-btn active" data-view="home">Home</button>
-          <button class="nav-btn" data-view="weekly">Weekly</button>
-          <button class="nav-btn" data-view="monthly">Monthly</button>
+          <button class="nav-btn" data-view="history">History</button>
         </nav>
         <div class="sidebar-footer">
           <button id="colorPaletteBtn" class="color-palette-btn">Customize</button>
@@ -71,51 +70,24 @@
             </div>
 
             <!-- Summary UI (No functionality yet) -->
-            <div class="summary-section">
-              <h3>Summary</h3>
-              <div class="summary-placeholder">
-                <div class="summary-controls">
-                  <select id="summaryPeriod" class="summary-select">
+            <div class="history-section">
+              <h3>History</h3>
+              <div class="history-placeholder">
+                <div class="history-controls">
+                  <select id="historyPeriod" class="history-select">
                     <option value="day">Last 24 hours</option>
                     <option value="week">Last 7 days</option>
                     <option value="month">Last 30 days</option>
                   </select>
-                  <button id="generateSummaryBtn" class="summary-btn">Generate Report</button>
+                  <button id="generateHistoryBtn" class="history-btn">Generate Report</button>
                 </div>
-                <div class="summary-content">
-                  <p class="summary-message">Summary will appear here</p>
+                <div class="history-content">
+                  <p class="history-message">History will appear here</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
-        <!-- Weekly Summary (scroll down) -->
-        <div class="weekly-summary-section">
-          <h3>Weekly Overview</h3>
-          <canvas id="weeklyChart" width="800" height="250"></canvas>
-        </div>
-
-        <!-- Monthly Summary (scroll down) -->
-        <div class="monthly-summary-section">
-          <h3>Monthly Overview</h3>
-          <canvas id="monthlyChart" width="800" height="250"></canvas>
-        </div>
-      </div>
-
-      <!-- Weekly View (separate page) -->
-      <div id="weeklyView" class="view">
-        <h3>Weekly Details</h3>
-        <canvas id="weeklyChartFull" width="800" height="400"></canvas>
-      </div>
-
-      <!-- Monthly View (separate page) -->
-      <div id="monthlyView" class="view">
-        <h3>Monthly Details</h3>
-        <canvas id="monthlyChartFull" width="800" height="400"></canvas>
-      </div>
-    </div>
-  </div>
 
   <!-- Color Palette Modal -->
   <div id="colorModal" class="modal">
