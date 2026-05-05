@@ -1,6 +1,6 @@
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
-const { getActiveWindow } = require("./tracker");
+const { getActiveWindow } = require("./lintracker");
 const fs = require("fs");
 
 let win;
