@@ -41,7 +41,16 @@
         <div id="breakModal" class="break-modal">
           <div class="break-modal-content">
             <h3>Take a Break</h3>
-            <input type="number" id="breakMinutesInput" placeholder="Minutes" min="1" max="180" value="15">
+            <div class="break-time-inputs">
+              <div class="break-time-group">
+                <label for="breakHoursInput">Hours</label>
+                <input type="number" id="breakHoursInput" placeholder="0" min="0" max="10" value="0">
+              </div>
+              <div class="break-time-group">
+                <label for="breakMinutesInput">Minutes</label>
+                <input type="number" id="breakMinutesInput" placeholder="0" min="0" max="59" value="0">
+              </div>
+            </div>
             <div class="break-modal-buttons">
               <button id="confirmBreakBtn" class="confirm-break-btn">Start Break</button>
               <button id="cancelBreakBtn" class="cancel-break-btn">Cancel</button>
@@ -176,12 +185,45 @@
         </div>
 
         <div class="settings-card">
+          <div class="settings-section-title">Notification Settings</div>
+          <div class="app-rules-panel notification-settings">
+            <div class="notification-row">
+              <label for="notifyToggle">Enable Unproductive Alerts</label>
+              <input type="checkbox" id="notifyToggle" checked>
+            </div>
+            <div class="notification-row">
+              <label for="notifyThresholdInput">Threshold</label>
+              <input type="number" id="notifyThresholdInput" min="1" max="240" value="5">
+              <select id="notifyUnitSelect">
+                <option value="minutes">minutes</option>
+                <option value="hours">hours</option>
+              </select>
+            </div>
+            <div id="notifySummary" class="notification-summary">Saved for future sessions.</div>
+          </div>
+
+          <div class="settings-section-title">Distraction Report History</div>
+          <div class="app-rules-panel report-history-panel">
+            <div id="reportHistoryEmpty" class="app-rules-empty">No distraction reports yet.</div>
+            <div id="reportHistoryList" class="report-history-list"></div>
+            <button id="clearReportHistoryBtn" class="report-history-clear" type="button">Clear History</button>
+          </div>
+
           <div class="settings-section-title">App Classification Rules</div>
           <div class="app-rules-panel">
             <div class="app-rules-add-row">
               <input id="appKeywordInput" class="app-rules-input" type="text" placeholder="e.g. linkedin, udemy, discord">
               <button id="addProductiveKeywordBtn" class="app-rule-add-btn productive">Add Productive</button>
               <button id="addUnproductiveKeywordBtn" class="app-rule-add-btn unproductive">Add Unproductive</button>
+            </div>
+            <div class="app-rules-toolbar">
+              <label for="appRulesSort" class="app-rules-sort-label">Sort</label>
+              <select id="appRulesSort" class="app-rules-sort">
+                <option value="recent">Recent added</option>
+                <option value="alphabetical">Alphabetical</option>
+                <option value="category">Category</option>
+              </select>
+              <span id="appRulesNotice" class="app-rules-notice"></span>
             </div>
             <div class="app-rules-header">
               <span class="app-col-name">App Keyword</span>
@@ -201,5 +243,23 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="renderer.js"></script>
+  <!-- Distraction report modal -->
+  <div id="distractedModal" class="distracted-modal" style="display:none;">
+    <div class="distracted-modal-content">
+      <h3>Quick check — what distracted you?</h3>
+      <div class="distracted-options">
+        <label><input type="radio" name="distractReason" value="notifications"> Notifications</label>
+        <label><input type="radio" name="distractReason" value="phone"> Phone / Messages</label>
+        <label><input type="radio" name="distractReason" value="social"> Social Media</label>
+        <label><input type="radio" name="distractReason" value="fatigue"> Fatigue</label>
+        <label><input type="radio" name="distractReason" value="other"> Other</label>
+      </div>
+      <textarea id="distractNote" placeholder="Optional note (what happened?)"></textarea>
+      <div class="distracted-actions">
+        <button id="distractSubmitBtn" class="confirm-break-btn">Submit</button>
+        <button id="distractDismissBtn" class="cancel-break-btn">Dismiss</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

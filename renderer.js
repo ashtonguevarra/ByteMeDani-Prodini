@@ -12,6 +12,7 @@ const cancelBreakBtn = document.getElementById("cancelBreakBtn");
 const activeBreakBar = document.getElementById("activeBreakBar");
 const breakTimerDisplay = document.getElementById("breakTimerDisplay");
 const endBreakBtn = document.getElementById("endBreakBtn");
+const breakHoursInput = document.getElementById("breakHoursInput");
 const breakMinutesInput = document.getElementById("breakMinutesInput");
 const overrideCurrentAppEl = document.getElementById("overrideCurrentApp");
 const overrideStatusEl = document.getElementById("overrideStatus");
@@ -25,8 +26,21 @@ const clearCurrentOverrideBtn = document.getElementById("clearCurrentOverrideBtn
 const appKeywordInput = document.getElementById("appKeywordInput");
 const addProductiveKeywordBtn = document.getElementById("addProductiveKeywordBtn");
 const addUnproductiveKeywordBtn = document.getElementById("addUnproductiveKeywordBtn");
+const appRulesSortSelect = document.getElementById("appRulesSort");
+const appRulesNotice = document.getElementById("appRulesNotice");
 const appRulesList = document.getElementById("appRulesList");
 const appRulesEmpty = document.getElementById("appRulesEmpty");
+const notifyToggle = document.getElementById("notifyToggle");
+const notifyThresholdInput = document.getElementById("notifyThresholdInput");
+const notifyUnitSelect = document.getElementById("notifyUnitSelect");
+const notifySummary = document.getElementById("notifySummary");
+const reportHistoryList = document.getElementById("reportHistoryList");
+const reportHistoryEmpty = document.getElementById("reportHistoryEmpty");
+const clearReportHistoryBtn = document.getElementById("clearReportHistoryBtn");
+const distractedModal = document.getElementById("distractedModal");
+const distractSubmitBtn = document.getElementById("distractSubmitBtn");
+const distractDismissBtn = document.getElementById("distractDismissBtn");
+const distractNote = document.getElementById("distractNote");
 
 let activityChart = null;
 let weeklyChart = null;
@@ -86,14 +100,17 @@ cancelBreakBtn.addEventListener("click", () => {
 });
 
 confirmBreakBtn.addEventListener("click", () => {
-  const minutes = parseInt(breakMinutesInput.value);
-  if (isNaN(minutes) || minutes < 1) {
-    alert("Please enter a valid number of minutes");
+  const hours = parseInt(breakHoursInput.value) || 0;
+  const minutes = parseInt(breakMinutesInput.value) || 0;
+  const totalMinutes = (hours * 60) + minutes;
+  
+  if (totalMinutes < 1) {
+    alert("Please enter at least 1 minute for your break");
     return;
   }
   
   breakActive = true;
-  breakEndTime = Date.now() + (minutes * 60 * 1000);
+  breakEndTime = Date.now() + (totalMinutes * 60 * 1000);
   
   breakModal.style.display = "none";
   activeBreakBar.style.display = "flex";
@@ -236,7 +253,13 @@ const restApps = [
   'spotify', 'music', 'apple music'
 ];
 
-const APP_RULES_STORAGE_KEY = "tracker.appRules.v1";
+const APP_RULES_STORAGE_KEY = "tracker.appRules.v2";
+
+let appRuleMeta = {};
+let appRuleSortMode = "recent";
+let recentlyAddedRuleKey = "";
+let recentlyAddedRuleCategory = "";
+let recentlyAddedRuleTimeout = null;
 
 function normalizeKeyword(value) {
   return (value || "").toLowerCase().trim();
@@ -246,36 +269,293 @@ function dedupeKeywords(list) {
   return [...new Set((list || []).map(normalizeKeyword).filter(Boolean))];
 }
 
+function getKeywordCategory(keyword) {
+  const normalized = normalizeKeyword(keyword);
+  if (!normalized) return null;
+  if (productiveApps.includes(normalized)) return "productive";
+  if (unproductiveApps.includes(normalized)) return "unproductive";
+  return null;
+}
+
+function getRuleMeta(keyword) {
+  return appRuleMeta[normalizeKeyword(keyword)] || { addedAt: 0 };
+}
+
+function setRuleMeta(keyword, updates) {
+  const normalized = normalizeKeyword(keyword);
+  if (!normalized) return;
+
+  appRuleMeta[normalized] = {
+    ...(appRuleMeta[normalized] || {}),
+    ...updates
+  };
+}
+
 function loadAppRulesFromStorage() {
   try {
     const raw = localStorage.getItem(APP_RULES_STORAGE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
+    if (!raw) {
+      productiveApps = [...DEFAULT_PRODUCTIVE_APPS];
+      unproductiveApps = [...DEFAULT_UNPRODUCTIVE_APPS];
+      appRuleMeta = {};
+      appRuleSortMode = "recent";
+      return;
+    }
 
+    const parsed = JSON.parse(raw);
     const savedProductive = dedupeKeywords(parsed.productive);
     const savedUnproductive = dedupeKeywords(parsed.unproductive);
+    const savedMeta = parsed.meta && typeof parsed.meta === "object" ? parsed.meta : {};
 
     productiveApps = savedProductive.length ? savedProductive : [...DEFAULT_PRODUCTIVE_APPS];
     unproductiveApps = savedUnproductive.length ? savedUnproductive : [...DEFAULT_UNPRODUCTIVE_APPS];
-
     unproductiveApps = unproductiveApps.filter(app => !productiveApps.includes(app));
+
+    appRuleMeta = {};
+    for (let index = 0; index < productiveApps.length; index += 1) {
+      const keyword = productiveApps[index];
+      const savedEntry = savedMeta[keyword];
+      setRuleMeta(keyword, {
+        addedAt: typeof savedEntry?.addedAt === "number" ? savedEntry.addedAt : (DEFAULT_PRODUCTIVE_APPS.includes(keyword) ? 0 : index + 1),
+        category: "productive"
+      });
+    }
+
+    for (let index = 0; index < unproductiveApps.length; index += 1) {
+      const keyword = unproductiveApps[index];
+      const savedEntry = savedMeta[keyword];
+      setRuleMeta(keyword, {
+        addedAt: typeof savedEntry?.addedAt === "number" ? savedEntry.addedAt : (DEFAULT_UNPRODUCTIVE_APPS.includes(keyword) ? 0 : index + 1),
+        category: "unproductive"
+      });
+    }
+
+    appRuleSortMode = ["recent", "alphabetical", "category"].includes(parsed.sortMode) ? parsed.sortMode : "recent";
   } catch {
     productiveApps = [...DEFAULT_PRODUCTIVE_APPS];
     unproductiveApps = [...DEFAULT_UNPRODUCTIVE_APPS];
+    appRuleMeta = {};
+    appRuleSortMode = "recent";
   }
 }
 
 function saveAppRulesToStorage() {
   const payload = {
     productive: dedupeKeywords(productiveApps),
-    unproductive: dedupeKeywords(unproductiveApps)
+    unproductive: dedupeKeywords(unproductiveApps),
+    meta: appRuleMeta,
+    sortMode: appRulesSortSelect?.value || appRuleSortMode
   };
   localStorage.setItem(APP_RULES_STORAGE_KEY, JSON.stringify(payload));
 }
 
+// Notification settings and distraction reports
+const NOTIFY_SETTINGS_KEY = 'tracker.notifySettings.v1';
+const DISTRACTION_REPORTS_KEY = 'tracker.distractionReports.v1';
+let notificationSettings = { enabled: true, thresholdMinutes: 5, unit: 'minutes' };
+let distractionReports = [];
+let unproductiveSessionStart = null;
+let unproductiveNotified = false;
+let lastUnproductiveApp = null;
+
+function loadNotificationSettings() {
+  try {
+    const raw = localStorage.getItem(NOTIFY_SETTINGS_KEY);
+    console.log('[Settings] Loaded from storage:', raw);
+    if (!raw) {
+      console.log('[Settings] No saved settings, using defaults');
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    notificationSettings = {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : true,
+      thresholdMinutes: typeof parsed.thresholdMinutes === 'number' ? parsed.thresholdMinutes : 5,
+      unit: parsed.unit || 'minutes'
+    };
+    console.log('[Settings] Loaded settings:', notificationSettings);
+  } catch (e) {
+    console.error('[Settings] Error loading:', e);
+  }
+}
+
+function saveNotificationSettings() {
+  try {
+    localStorage.setItem(NOTIFY_SETTINGS_KEY, JSON.stringify(notificationSettings));
+  } catch (e) {}
+}
+
+function loadDistractionReports() {
+  try {
+    const raw = localStorage.getItem(DISTRACTION_REPORTS_KEY);
+    if (!raw) { distractionReports = []; return; }
+    distractionReports = JSON.parse(raw) || [];
+  } catch (e) { distractionReports = []; }
+}
+
+function saveDistractionReport(report) {
+  try {
+    distractionReports.push(report);
+    localStorage.setItem(DISTRACTION_REPORTS_KEY, JSON.stringify(distractionReports));
+    renderDistractionReports();
+  } catch (e) {}
+}
+
+function formatReportTime(ts) {
+  return new Date(ts).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function getReasonLabel(reason) {
+  const labels = {
+    notifications: 'Notifications',
+    phone: 'Phone / Messages',
+    social: 'Social Media',
+    fatigue: 'Fatigue',
+    other: 'Other',
+    unknown: 'Unspecified'
+  };
+  return labels[reason] || labels.unknown;
+}
+
+function updateNotificationSummary() {
+  if (!notifySummary) return;
+  const enabled = notificationSettings.enabled ? 'On' : 'Off';
+  const unit = notificationSettings.unit || 'minutes';
+  const threshold = notificationSettings.thresholdMinutes || 5;
+  notifySummary.textContent = `Alerts ${enabled} • Notify after ${threshold} ${unit} of continuous unproductive time.`;
+}
+
+function renderDistractionReports() {
+  if (!reportHistoryList || !reportHistoryEmpty) return;
+
+  const reports = [...distractionReports].sort((left, right) => right.ts - left.ts);
+  reportHistoryList.innerHTML = '';
+  reportHistoryEmpty.style.display = reports.length ? 'none' : 'block';
+
+  for (const report of reports.slice(0, 10)) {
+    const item = document.createElement('div');
+    item.className = 'report-history-item';
+    item.innerHTML = `
+      <div class="report-history-top">
+        <span class="report-history-app">${report.app || 'Unknown app'}</span>
+        <span class="report-history-time">${formatReportTime(report.ts)}</span>
+      </div>
+      <div class="report-history-meta">${getReasonLabel(report.reason)} • ${report.durationMinutes || 0} min</div>
+      ${report.note ? `<div class="report-history-note">${report.note}</div>` : ''}
+    `;
+    reportHistoryList.appendChild(item);
+  }
+}
+
+// Initialize notification UI values
+loadNotificationSettings();
+loadDistractionReports();
+if (notifyToggle) notifyToggle.checked = !!notificationSettings.enabled;
+if (notifyThresholdInput) notifyThresholdInput.value = notificationSettings.thresholdMinutes || 5;
+if (notifyUnitSelect) notifyUnitSelect.value = notificationSettings.unit || 'minutes';
+updateNotificationSummary();
+renderDistractionReports();
+
+// Hook up UI changes
+if (notifyToggle) notifyToggle.addEventListener('change', () => {
+  notificationSettings.enabled = !!notifyToggle.checked;
+  saveNotificationSettings();
+  updateNotificationSummary();
+});
+if (notifyThresholdInput) notifyThresholdInput.addEventListener('change', () => {
+  const val = parseInt(notifyThresholdInput.value) || 0;
+  notificationSettings.thresholdMinutes = val;
+  saveNotificationSettings();
+  updateNotificationSummary();
+});
+if (notifyUnitSelect) notifyUnitSelect.addEventListener('change', () => {
+  notificationSettings.unit = notifyUnitSelect.value || 'minutes';
+  saveNotificationSettings();
+  updateNotificationSummary();
+});
+
+if (clearReportHistoryBtn) {
+  clearReportHistoryBtn.addEventListener('click', () => {
+    distractionReports = [];
+    localStorage.setItem(DISTRACTION_REPORTS_KEY, JSON.stringify(distractionReports));
+    renderDistractionReports();
+  });
+}
+
+// Distracted modal handlers
+if (distractDismissBtn) {
+  distractDismissBtn.addEventListener('click', () => {
+    if (distractedModal) distractedModal.style.display = 'none';
+  });
+}
+if (distractSubmitBtn) {
+  distractSubmitBtn.addEventListener('click', () => {
+    const reasonEl = document.querySelector('input[name="distractReason"]:checked');
+    const reason = reasonEl ? reasonEl.value : 'unknown';
+    const note = (distractNote?.value || '').trim();
+    const duration = unproductiveSessionStart ? Math.round((Date.now() - unproductiveSessionStart) / 60000) : 0;
+    const report = { ts: Date.now(), app: lastUnproductiveApp || '', durationMinutes: duration, reason, note };
+    saveDistractionReport(report);
+    if (distractedModal) distractedModal.style.display = 'none';
+  });
+}
+
+function triggerUnproductiveNotification(app, durationMinutes) {
+  try {
+    const title = 'Unproductive time detected';
+    const body = `You've been on unproductive activities for ${durationMinutes} minute(s) — ${app}`;
+    console.log('[Notification] Attempting to trigger:', { title, body, app, durationMinutes });
+    if (window.api?.showUnproductiveNotification) {
+      window.api.showUnproductiveNotification({ title, body }).catch(err => {
+        console.error('[Notification] IPC notification error:', err);
+      });
+    } else if (window.Notification) {
+      if (Notification.permission === 'granted') {
+        new Notification(title, { body });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(p => { if (p === 'granted') new Notification(title, { body }); });
+      }
+    }
+  } catch (e) {
+    console.error('[Notification] Exception:', e);
+  }
+
+  // Show in-app prompt
+  lastUnproductiveApp = app;
+  if (distractedModal) {
+    console.log('[Distraction Modal] Showing distraction modal');
+    // clear previous selections
+    const checked = document.querySelector('input[name="distractReason"]:checked');
+    if (checked) checked.checked = false;
+    if (distractNote) distractNote.value = '';
+    distractedModal.style.display = 'block';
+  } else {
+    console.log('[Distraction Modal] Modal element not found!');
+  }
+}
+
+function setAppRulesNotice(message) {
+  if (!appRulesNotice) return;
+  appRulesNotice.textContent = message || "";
+  if (message) {
+    window.clearTimeout(recentlyAddedRuleTimeout);
+    recentlyAddedRuleTimeout = window.setTimeout(() => {
+      if (appRulesNotice) appRulesNotice.textContent = "";
+      recentlyAddedRuleKey = "";
+      if (appRulesList) renderAppRulesEditor();
+    }, 2200);
+  }
+}
+
 function removeKeywordFromRules(keyword) {
-  productiveApps = productiveApps.filter(app => app !== keyword);
-  unproductiveApps = unproductiveApps.filter(app => app !== keyword);
+  const normalized = normalizeKeyword(keyword);
+  productiveApps = productiveApps.filter(app => app !== normalized);
+  unproductiveApps = unproductiveApps.filter(app => app !== normalized);
+  delete appRuleMeta[normalized];
 }
 
 function setKeywordCategory(keyword, category, isChecked) {
@@ -286,8 +566,10 @@ function setKeywordCategory(keyword, category, isChecked) {
     if (isChecked) {
       if (!productiveApps.includes(normalized)) productiveApps.push(normalized);
       unproductiveApps = unproductiveApps.filter(app => app !== normalized);
+      setRuleMeta(normalized, { addedAt: getRuleMeta(normalized).addedAt || Date.now(), category: "productive" });
     } else {
       productiveApps = productiveApps.filter(app => app !== normalized);
+      if (getKeywordCategory(normalized) !== "unproductive") delete appRuleMeta[normalized];
     }
   }
 
@@ -295,8 +577,10 @@ function setKeywordCategory(keyword, category, isChecked) {
     if (isChecked) {
       if (!unproductiveApps.includes(normalized)) unproductiveApps.push(normalized);
       productiveApps = productiveApps.filter(app => app !== normalized);
+      setRuleMeta(normalized, { addedAt: getRuleMeta(normalized).addedAt || Date.now(), category: "unproductive" });
     } else {
       unproductiveApps = unproductiveApps.filter(app => app !== normalized);
+      if (getKeywordCategory(normalized) !== "productive") delete appRuleMeta[normalized];
     }
   }
 
@@ -311,43 +595,118 @@ function addKeywordToCategory(category) {
   if (category === "productive") {
     if (!productiveApps.includes(normalized)) productiveApps.push(normalized);
     unproductiveApps = unproductiveApps.filter(app => app !== normalized);
+    setRuleMeta(normalized, { addedAt: Date.now(), category: "productive" });
   }
 
   if (category === "unproductive") {
     if (!unproductiveApps.includes(normalized)) unproductiveApps.push(normalized);
     productiveApps = productiveApps.filter(app => app !== normalized);
+    setRuleMeta(normalized, { addedAt: Date.now(), category: "unproductive" });
   }
 
+  recentlyAddedRuleKey = normalized;
+  recentlyAddedRuleCategory = category;
   saveAppRulesToStorage();
   renderAppRulesEditor();
+  setAppRulesNotice(`Added ${normalized} to ${getCategoryLabel(category)}.`);
   if (appKeywordInput) appKeywordInput.value = "";
+}
+
+function getSortedAppRules() {
+  const keywords = [...new Set([...productiveApps, ...unproductiveApps])];
+  const sortMode = appRulesSortSelect?.value || appRuleSortMode || "recent";
+
+  if (sortMode === "alphabetical") {
+    return keywords.sort((left, right) => left.localeCompare(right));
+  }
+
+  if (sortMode === "category") {
+    return keywords.sort((left, right) => {
+      const leftCategory = getKeywordCategory(left) || "";
+      const rightCategory = getKeywordCategory(right) || "";
+      if (leftCategory !== rightCategory) {
+        return leftCategory === "productive" ? -1 : 1;
+      }
+      return left.localeCompare(right);
+    });
+  }
+
+  return keywords.sort((left, right) => {
+    const leftTime = getRuleMeta(left).addedAt || 0;
+    const rightTime = getRuleMeta(right).addedAt || 0;
+    if (leftTime !== rightTime) return rightTime - leftTime;
+    return left.localeCompare(right);
+  });
+}
+
+function isAppBuiltIn(keyword) {
+  return DEFAULT_PRODUCTIVE_APPS.includes(keyword) || DEFAULT_UNPRODUCTIVE_APPS.includes(keyword);
 }
 
 function renderAppRulesEditor() {
   if (!appRulesList || !appRulesEmpty) return;
 
-  const keywords = [...new Set([...productiveApps, ...unproductiveApps])].sort();
+  const keywords = getSortedAppRules();
   appRulesList.innerHTML = "";
   appRulesEmpty.style.display = keywords.length ? "none" : "block";
 
-  for (const keyword of keywords) {
-    const row = document.createElement("div");
-    row.className = "app-rule-row";
-    row.innerHTML = `
-      <span class="app-rule-name" title="${keyword}">${keyword}</span>
-      <div class="app-rule-check">
-        <input type="checkbox" data-keyword="${keyword}" data-category="productive" ${productiveApps.includes(keyword) ? "checked" : ""}>
-      </div>
-      <div class="app-rule-check">
-        <input type="checkbox" data-keyword="${keyword}" data-category="unproductive" ${unproductiveApps.includes(keyword) ? "checked" : ""}>
-      </div>
-      <button class="app-rule-remove" data-remove="${keyword}">Remove</button>
-    `;
-    appRulesList.appendChild(row);
+  // Split into built-in and custom
+  const builtInApps = keywords.filter(k => isAppBuiltIn(k));
+  const customApps = keywords.filter(k => !isAppBuiltIn(k));
+
+  // Render Custom section first
+  if (customApps.length > 0) {
+    const customHeader = document.createElement("div");
+    customHeader.className = "app-rules-section-header";
+    customHeader.textContent = "Custom Apps";
+    appRulesList.appendChild(customHeader);
+
+    for (const keyword of customApps) {
+      const row = document.createElement("div");
+      row.className = "app-rule-row app-rule-custom";
+      if (keyword === recentlyAddedRuleKey) row.classList.add("highlighted");
+      row.innerHTML = `
+        <span class="app-rule-name" title="${keyword}">${keyword}</span>
+        <div class="app-rule-check">
+          <input type="checkbox" data-keyword="${keyword}" data-category="productive" ${productiveApps.includes(keyword) ? "checked" : ""}>
+        </div>
+        <div class="app-rule-check">
+          <input type="checkbox" data-keyword="${keyword}" data-category="unproductive" ${unproductiveApps.includes(keyword) ? "checked" : ""}>
+        </div>
+        <button class="app-rule-remove" data-remove="${keyword}">Remove</button>
+      `;
+      appRulesList.appendChild(row);
+    }
+  }
+
+  // Render Built-in section
+  if (builtInApps.length > 0) {
+    const builtInHeader = document.createElement("div");
+    builtInHeader.className = "app-rules-section-header";
+    builtInHeader.textContent = "Built-in Apps (Locked)";
+    appRulesList.appendChild(builtInHeader);
+
+    for (const keyword of builtInApps) {
+      const row = document.createElement("div");
+      row.className = "app-rule-row app-rule-builtin";
+      if (keyword === recentlyAddedRuleKey) row.classList.add("highlighted");
+      row.innerHTML = `
+        <span class="app-rule-name" title="${keyword}">${keyword}</span>
+        <div class="app-rule-check">
+          <input type="checkbox" data-keyword="${keyword}" data-category="productive" ${productiveApps.includes(keyword) ? "checked" : ""}>
+        </div>
+        <div class="app-rule-check">
+          <input type="checkbox" data-keyword="${keyword}" data-category="unproductive" ${unproductiveApps.includes(keyword) ? "checked" : ""}>
+        </div>
+        <button class="app-rule-remove app-rule-remove-disabled" disabled title="Built-in apps cannot be removed">Locked</button>
+      `;
+      appRulesList.appendChild(row);
+    }
   }
 }
 
 loadAppRulesFromStorage();
+if (appRulesSortSelect) appRulesSortSelect.value = appRuleSortMode;
 
 function getCategoryLabel(category) {
   return category.charAt(0).toUpperCase() + category.slice(1);
@@ -498,7 +857,20 @@ if (appRulesList) {
     const removeKeyword = target.dataset.remove;
     if (!removeKeyword) return;
 
+    // Prevent removal of built-in apps
+    if (isAppBuiltIn(removeKeyword)) {
+      return;
+    }
+
     removeKeywordFromRules(removeKeyword);
+    saveAppRulesToStorage();
+    renderAppRulesEditor();
+  });
+}
+
+if (appRulesSortSelect) {
+  appRulesSortSelect.addEventListener("change", () => {
+    appRuleSortMode = appRulesSortSelect.value;
     saveAppRulesToStorage();
     renderAppRulesEditor();
   });
@@ -581,6 +953,7 @@ addLogHeader();
 window.api.onUpdate((data) => {
   const now = new Date();
   currentWindowName = data.current || "No active window";
+  console.log('[onUpdate] Window changed to:', currentWindowName);
 
   if (!isTrackerWindow(currentWindowName)) {
     lastNonTrackerWindowName = currentWindowName;
@@ -591,6 +964,42 @@ window.api.onUpdate((data) => {
   }
 
   updateOverrideStatus();
+
+  // Unproductive session detection for alerts
+  if (!isTrackerWindow(currentWindowName) && notificationSettings.enabled) {
+    const currentCategoryForNotify = categorizeApp(currentWindowName);
+    console.log('[onUpdate] Unproductive detection - Category:', currentCategoryForNotify);
+
+    if (currentCategoryForNotify === 'unproductive') {
+      if (!unproductiveSessionStart) {
+        console.log('[onUpdate] Starting new unproductive session');
+        unproductiveSessionStart = now.getTime();
+        unproductiveNotified = false;
+        lastUnproductiveApp = currentWindowName;
+        console.log('[onUpdate] Session info:', { start: unproductiveSessionStart, app: lastUnproductiveApp });
+      }
+
+      if (!unproductiveNotified) {
+        const threshold = notificationSettings.thresholdMinutes || 5;
+        const thresholdMs = (notificationSettings.unit === 'hours'
+          ? threshold * 60 * 60 * 1000
+          : threshold * 60 * 1000);
+
+        if (thresholdMs > 0 && (now.getTime() - unproductiveSessionStart) >= thresholdMs) {
+          triggerUnproductiveNotification(lastUnproductiveApp || currentWindowName, Math.max(1, Math.round((now.getTime() - unproductiveSessionStart) / 60000)));
+          unproductiveNotified = true;
+        }
+      }
+    } else {
+      unproductiveSessionStart = null;
+      unproductiveNotified = false;
+      lastUnproductiveApp = null;
+    }
+  } else if (isTrackerWindow(currentWindowName)) {
+    unproductiveSessionStart = null;
+    unproductiveNotified = false;
+    lastUnproductiveApp = null;
+  }
   
   if (lastEntry && lastTimestamp && lastEntry !== currentWindowName) {
     const timeDiff = (now - lastTimestamp) / 1000 / 60;
@@ -608,13 +1017,61 @@ window.api.onUpdate((data) => {
   
   updateChart();
   updateLegend();
-  addToLog(currentWindowName, now);
+  // Don't log the tracker app itself to activity log
+  if (!isTrackerWindow(currentWindowName)) {
+    addToLog(currentWindowName, now);
+  }
   updateWeeklyCharts();
   updateMonthlyCharts();
   
   lastEntry = currentWindowName;
   lastTimestamp = now;
 });
+
+// === Periodic check for continuous unproductive sessions ===
+// Catches long sessions on same app where window changes don't trigger onUpdate()
+let timerCheckCount = 0;
+setInterval(() => {
+  try {
+    timerCheckCount++;
+    console.log(`[Timer Check #${timerCheckCount}]`, {
+      enabled: notificationSettings.enabled,
+      currentWindow: currentWindowName,
+      isTracker: isTrackerWindow(currentWindowName),
+      sessionStart: unproductiveSessionStart,
+      alreadyNotified: unproductiveNotified
+    });
+    
+    if (!notificationSettings.enabled || !currentWindowName || isTrackerWindow(currentWindowName)) return;
+    
+    const currentCategory = categorizeApp(currentWindowName);
+    console.log(`[Timer Check #${timerCheckCount}] Category for "${currentWindowName}":`, currentCategory);
+    
+    if (currentCategory !== 'unproductive' || !unproductiveSessionStart || unproductiveNotified) return;
+    
+    const threshold = notificationSettings.thresholdMinutes || 5;
+    const thresholdMs = (notificationSettings.unit === 'hours'
+      ? threshold * 60 * 60 * 1000
+      : threshold * 60 * 1000);
+    const elapsed = Date.now() - unproductiveSessionStart;
+    
+    console.log(`[Timer Check #${timerCheckCount}] Threshold check:`, {
+      threshold: threshold + ' ' + notificationSettings.unit,
+      thresholdMs: thresholdMs,
+      elapsedMs: elapsed,
+      elapsedMinutes: Math.round(elapsed / 60000),
+      shouldTrigger: thresholdMs > 0 && elapsed >= thresholdMs
+    });
+    
+    if (thresholdMs > 0 && elapsed >= thresholdMs) {
+      console.log(`[Timer Check #${timerCheckCount}] TRIGGERING NOTIFICATION!`);
+      triggerUnproductiveNotification(lastUnproductiveApp || currentWindowName, Math.max(1, Math.round(elapsed / 60000)));
+      unproductiveNotified = true;
+    }
+  } catch (e) {
+    console.error(`[Timer Check] Error:`, e);
+  }
+}, 30000); // Check every 30 seconds
 
 // Responsive pie chart size
 function updateChartSize() {
@@ -644,13 +1101,13 @@ window.addEventListener('resize', () => {
 function updateChart() {
   const ctx = document.getElementById('activityChart').getContext('2d');
   updateChartSize();
-  const chartLabels = ['Productive', 'Unproductive', 'Rest', 'Unknown'];
-  const chartData = [timeSpent.productive, timeSpent.unproductive, timeSpent.rest, timeSpent.unknown];
+  const chartLabels = ['Productive', 'Unproductive', 'Rest'];
+  const chartData = [timeSpent.productive, timeSpent.unproductive, timeSpent.rest];
   
   if (activityChart) {
     activityChart.data.labels = chartLabels;
     activityChart.data.datasets[0].data = chartData;
-    activityChart.data.datasets[0].backgroundColor = [customColors.productive, customColors.unproductive, customColors.rest, customColors.unknown];
+    activityChart.data.datasets[0].backgroundColor = [customColors.productive, customColors.unproductive, customColors.rest];
     activityChart.update();
   } else {
     activityChart = new Chart(ctx, {
@@ -659,7 +1116,7 @@ function updateChart() {
         labels: chartLabels,
         datasets: [{
           data: chartData,
-          backgroundColor: [customColors.productive, customColors.unproductive, customColors.rest, customColors.unknown],
+          backgroundColor: [customColors.productive, customColors.unproductive, customColors.rest],
           borderWidth: 1,
           radius: '90%'
         }]
@@ -673,7 +1130,7 @@ function updateChart() {
             callbacks: { 
               label: (context) => {
                 const value = context.raw || 0;
-                const total = timeSpent.productive + timeSpent.unproductive + timeSpent.rest + timeSpent.unknown;
+                const total = timeSpent.productive + timeSpent.unproductive + timeSpent.rest;
                 const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                 const hours = Math.floor(value / 60);
                 const mins = Math.floor(value % 60);
@@ -718,13 +1175,6 @@ function updateLegend() {
           <span class="legend-label">Rest</span>
         </div>
         <span class="legend-time">${formatTime(timeSpent.rest)}</span>
-      </div>
-      <div class="legend-item">
-        <div style="display:flex; align-items:center;">
-          <div class="legend-color" style="background: ${customColors.unknown}"></div>
-          <span class="legend-label">Unknown</span>
-        </div>
-        <span class="legend-time">${formatTime(timeSpent.unknown)}</span>
       </div>
     `;
   }
@@ -788,8 +1238,7 @@ function updateWeeklyCharts() {
       datasets: [
         { label: 'Productive', data: weeklyDataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: 'Unproductive', data: weeklyDataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: 'Rest', data: weeklyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
-        { label: 'Unknown', data: weeklyDataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
+        { label: 'Rest', data: weeklyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
       ]
     },
     options: { 
@@ -823,8 +1272,7 @@ function updateMonthlyCharts() {
       datasets: [
         { label: 'Productive', data: monthlyDataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: 'Unproductive', data: monthlyDataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: 'Rest', data: monthlyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
-        { label: 'Unknown', data: monthlyDataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
+        { label: 'Rest', data: monthlyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
       ]
     },
     options: { 
@@ -858,8 +1306,7 @@ function updateWeeklyFullView() {
       datasets: [
         { label: 'Productive', data: weeklyDataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: 'Unproductive', data: weeklyDataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: 'Rest', data: weeklyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
-        { label: 'Unknown', data: weeklyDataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
+        { label: 'Rest', data: weeklyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
       ]
     },
     options: { 
@@ -890,8 +1337,7 @@ function updateMonthlyFullView() {
       datasets: [
         { label: 'Productive', data: monthlyDataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: 'Unproductive', data: monthlyDataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: 'Rest', data: monthlyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
-        { label: 'Unknown', data: monthlyDataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
+        { label: 'Rest', data: monthlyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
       ]
     },
     options: { 
