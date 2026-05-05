@@ -17,17 +17,16 @@ class ActivityLog(db.Model):
     window_title = db.Column(db.String(255), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-@app.route("/")
-def home():
-    return jsonify({"message": "Prodini database server is running"})
+with app.app_context():
+    db.create_all()
 
 @app.route("/logs", methods=["POST"])
 def add_log():
     data = request.json
 
     log = ActivityLog(
-        app_name=data.get("app_name", "Unknown"),
-        window_title=data.get("window_title", "Unknown")
+        app_name=data.get("app_name", "Unknown App"),
+        window_title=data.get("window_title", "Unknown Window")
     )
 
     db.session.add(log)
@@ -37,7 +36,7 @@ def add_log():
 
 @app.route("/logs", methods=["GET"])
 def get_logs():
-    logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).limit(50).all()
+    logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).limit(100).all()
 
     return jsonify([
         {
@@ -50,7 +49,4 @@ def get_logs():
     ])
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-
-    app.run(debug=True, port=5000)
+    app.run(port=5000, debug=True)

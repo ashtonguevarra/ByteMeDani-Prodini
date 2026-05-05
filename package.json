@@ -4,8 +4,10 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "backend": "cd backend && ./venv/bin/python app.py",
+    "electron": "electron .",
+    "start": "concurrently \"npm run backend\" \"wait-on http://127.0.0.1:5000/logs && npm run electron\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +16,9 @@
     "electron": "^41.5.0"
   },
   "dependencies": {
-    "active-win": "^8.2.1"
+    "active-win": "^8.2.1",
+    "concurrently": "^9.2.1",
+    "wait-on": "^9.0.5"
   }
 }
+
