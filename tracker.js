@@ -1,30 +1,78 @@
-const activeWin = require("active-win");
+const { execSync } = require("child_process");
+let activeWin;
 
-let lastApp = "";
-let lastTitle = "";
+// only load active-win on supported platforms
+try {
+  activeWin = require("active-win");
+} catch {}
 
-async function trackWindow() {
+function run(cmd) {
   try {
-    const win = await activeWin();
-
-    if (!win) return;
-
-    const currentApp = win.owner.name;
-    const currentTitle = win.title;
-
-    // Only log if something changed (prevents spam)
-    if (currentApp !== lastApp || currentTitle !== lastTitle) {
-      console.log("App:", currentApp);
-      console.log("Title:", currentTitle);
-      console.log("----------------------");
-
-      lastApp = currentApp;
-      lastTitle = currentTitle;
-    }
-  } catch (err) {
-    console.error("Tracker error:", err);
+    return execSync(cmd, { encoding: "utf8" }).trim();
+  } catch {
+    return null;
   }
 }
 
-// Run every 1 second
-setInterval(trackWindow, 1000);
+// HYPRLAND
+function getHyprlandWindow() {
+  const output = run("hyprctl -j activewindow");
+  if (!output) return null;
+
+  try {
+    const win = JSON.parse(output);
+    return `${win.class} - ${win.title}`;
+  } catch {
+    return null;
+  }
+}
+
+// X11
+function getX11Window() {
+  const id = run("xdotool getactivewindow");
+  if (!id) return null;
+
+  const title = run(`xdotool getwindowname ${id}`);
+  return title || null;
+}
+
+// WINDOWS + MAC
+async function getNativeWindow() {
+  if (!activeWin) return null;
+
+  try {
+    const win = await activeWin();
+    if (!win) return null;
+
+    return `${win.owner.name} - ${win.title}`;
+  } catch {
+    return null;
+  }
+}
+
+// MAIN FUNCTION
+async function getActiveWindow() {
+  const platform = process.platform;
+  const session = process.env.XDG_SESSION_TYPE || "";
+  const desktop = process.env.XDG_CURRENT_DESKTOP || "";
+
+  // Hyprland
+  if (desktop.toLowerCase().includes("hyprland")) {
+    const win = getHyprlandWindow();
+    if (win) return win;
+  }
+
+  // Linux X11
+  if (platform === "linux" && session === "x11") {
+    const win = getX11Window();
+    if (win) return win;
+  }
+
+  // Windows + macOS fallback
+  const win = await getNativeWindow();
+  if (win) return win;
+
+  return "Unsupported system";
+}
+
+module.exports = { getActiveWindow };
