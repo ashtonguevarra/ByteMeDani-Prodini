@@ -10,8 +10,9 @@ const activeBreakBar = document.getElementById("activeBreakBar");
 const breakTimerDisplay = document.getElementById("breakTimerDisplay");
 const endBreakBtn = document.getElementById("endBreakBtn");
 const breakMinutesInput = document.getElementById("breakMinutesInput");
-const resetBtn = document.getElementById("resetLog");
 const logDiv = document.getElementById("log");
+const resetBtn = document.getElementById("resetLog");
+const toggleBtn = document.getElementById("toggleTrackingBtn");
 
 
 
@@ -84,8 +85,20 @@ const sidebarToggle = document.getElementById("sidebarToggle");
 
 
 resetBtn.addEventListener("click", () => {
-  logDiv.innerHTML = "";
+  resetLogs();
 });
+
+function resetLogs() {
+  const header = document.querySelector(".log-header");
+
+  logEl.innerHTML = ""; // clears everything
+
+  if (header) {
+    logEl.appendChild(header); // restore header
+  }
+}
+
+
 if (sidebarToggle && sidebar) {
   sidebarToggle.addEventListener("click", () => {
     sidebar.classList.toggle("collapsed");

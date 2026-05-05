@@ -184,6 +184,11 @@ h3 {
   transform: translateY(-1px);
 }
 
+#resetLog:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .take-break-btn:hover {
   transform: translateY(-1px);
 }
