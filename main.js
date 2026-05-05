@@ -2,6 +2,7 @@ const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const { getActiveWindow } = require("./tracker");
 const fs = require("fs");
+const currentWindow = getActiveWindow();
 
 let win;
 let lastWindow = "";
