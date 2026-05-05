@@ -10,6 +10,10 @@ const activeBreakBar = document.getElementById("activeBreakBar");
 const breakTimerDisplay = document.getElementById("breakTimerDisplay");
 const endBreakBtn = document.getElementById("endBreakBtn");
 const breakMinutesInput = document.getElementById("breakMinutesInput");
+const resetBtn = document.getElementById("resetLog");
+const logDiv = document.getElementById("log");
+
+
 
 let activityChart = null;
 let weeklyChart = null;
@@ -27,6 +31,7 @@ let breakEndTime = null;
 
 let currentFontSize = 100;
 const fontSizeDisplay = document.getElementById("fontSizeModal");
+
 
 let customColors = {
   productive: "#4caf50",
@@ -77,6 +82,10 @@ setInterval(updateDateDisplay, 1000);
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebarToggle");
 
+
+resetBtn.addEventListener("click", () => {
+  logDiv.innerHTML = "";
+});
 if (sidebarToggle && sidebar) {
   sidebarToggle.addEventListener("click", () => {
     sidebar.classList.toggle("collapsed");

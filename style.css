@@ -168,6 +168,22 @@ h3 {
   transition: transform 0.2s;
 }
 
+
+.reset-log-btn {
+  padding: 8px 16px;
+  background: #f1b441;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: transform 0.2s;
+}
+
+.reset-log-btn:hover{
+  transform: translateY(-1px);
+}
+
 .take-break-btn:hover {
   transform: translateY(-1px);
 }
