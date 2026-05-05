@@ -1,17 +1,12 @@
 {
   "name": "logger-app",
   "version": "1.0.0",
-  "description": "",
   "main": "main.js",
   "scripts": {
     "backend": "cd backend && ./venv/bin/python app.py",
     "electron": "electron .",
-    "start": "concurrently \"npm run backend\" \"wait-on http://127.0.0.1:5000/logs && npm run electron\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "concurrently \"npm run backend\" \"wait-on http://127.0.0.1:5000/logs && npm run electron\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "electron": "^41.5.0"
   },
@@ -21,4 +16,3 @@
     "wait-on": "^9.0.5"
   }
 }
-

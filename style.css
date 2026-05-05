@@ -823,3 +823,23 @@ canvas#monthlyChart {
   color: #888;
   font-size: 0.7rem;
 }
+
+.top-bar-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.session-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #111827;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.session-btn.active {
+  background: #dc2626;
+}

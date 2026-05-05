@@ -910,4 +910,27 @@ if (generateSummaryBtn) {
   });
 }
 
+//start stop 
+const toggleTrackingBtn = document.getElementById("toggleTrackingBtn");
+
+let isTracking = false;
+
+toggleTrackingBtn.addEventListener("click", () => {
+  if (!isTracking) {
+    window.api.startTracking();
+  } else {
+    window.api.stopTracking();
+  }
+});
+
+window.api.onTrackingStatus((status) => {
+  isTracking = status.isTracking;
+
+  toggleTrackingBtn.textContent = isTracking
+    ? "Stop Session"
+    : "Start Session";
+
+  toggleTrackingBtn.classList.toggle("active", isTracking);
+});
+
 console.log("Dashboard Loaded ✨");
