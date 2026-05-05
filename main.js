@@ -1,8 +1,8 @@
-const { app, BrowserWindow, ipcMain, Notification, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu } = require("electron");
 const path = require("path");
 const { getActiveWindow } = require("./tracker");
 const fs = require("fs");
-const currentWindow = getActiveWindow();
+const notifier = require("node-notifier");
 
 let win;
 let lastWindow = "";
@@ -49,8 +49,6 @@ async function startTracking() {
     // defensive: ensure string
     const cw = (currentWindow || "").toString();
     const currentWindowNormalized = cw.toLowerCase().trim();
-    console.log("active-window (raw):", cw);
-    console.log("active-window (normalized):", currentWindowNormalized);
 
     if (currentWindowNormalized !== lastWindow) {
       const entry = {
@@ -63,7 +61,6 @@ async function startTracking() {
 
             
         if (win && win.webContents) {
-            console.log("WIN STATUS:", win);
         win.webContents.send("activity-update", {
           current: cw,
           currentNormalized: currentWindowNormalized,
@@ -77,25 +74,50 @@ async function startTracking() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === "win32") {
+    // Required by Windows for reliable toast notifications.
+    app.setAppUserModelId("com.bytemedani.tracker");
+  }
   Menu.setApplicationMenu(null);
   createWindow();
 });
 
 ipcMain.handle("show-unproductive-notification", (_, { title, body }) => {
   try {
-    if (Notification.isSupported()) {
-      new Notification({ title, body }).show();
-      return true;
-    }
+    console.log("[Notification] Creating notification with node-notifier");
+    
+    const notification = notifier.notify({
+      title: title,
+      message: body,
+      sound: false,
+      wait: true,
+      appID: "com.bytemedani.tracker"
+    }, (err, response, metadata) => {
+      if (err) {
+        console.error("[Notification] Error:", err);
+        return;
+      }
+      console.log("[Notification] Response from notifier:", response);
+      
+      if (response === "activate" || response === "clicked") {
+        console.log("[Notification] User clicked notification");
+        if (win && !win.isDestroyed()) {
+          console.log("[Notification] Focusing window and sending IPC");
+          if (win.isMinimized()) win.restore();
+          win.show();
+          win.focus();
+          setTimeout(() => {
+            if (win && !win.isDestroyed()) {
+              win.webContents.send("unproductive-notification-clicked");
+            }
+          }, 100);
+        }
+      }
+    });
+    
+    return true;
   } catch (error) {
-    console.error("Failed to show notification:", error);
+    console.error("[Notification] Failed to show notification:", error);
+    return false;
   }
-  return false;
 });
-
-if (win && !win.isDestroyed() && win.webContents) {
-  win.webContents.send("activity-update", {
-    current: currentWindow,
-    history: history.slice(-10)
-  });
-}

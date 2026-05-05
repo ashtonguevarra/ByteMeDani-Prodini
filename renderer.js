@@ -33,6 +33,8 @@ const appRulesEmpty = document.getElementById("appRulesEmpty");
 const notifyToggle = document.getElementById("notifyToggle");
 const notifyThresholdInput = document.getElementById("notifyThresholdInput");
 const notifyUnitSelect = document.getElementById("notifyUnitSelect");
+const notifySoundProfile = document.getElementById("notifySoundProfile");
+const notifyTestBtn = document.getElementById("notifyTestBtn");
 const notifySummary = document.getElementById("notifySummary");
 const reportHistoryList = document.getElementById("reportHistoryList");
 const reportHistoryEmpty = document.getElementById("reportHistoryEmpty");
@@ -352,7 +354,7 @@ function saveAppRulesToStorage() {
 // Notification settings and distraction reports
 const NOTIFY_SETTINGS_KEY = 'tracker.notifySettings.v1';
 const DISTRACTION_REPORTS_KEY = 'tracker.distractionReports.v1';
-let notificationSettings = { enabled: true, thresholdMinutes: 5, unit: 'minutes' };
+let notificationSettings = { enabled: true, thresholdMinutes: 5, unit: 'minutes', soundProfile: 'normal' };
 let distractionReports = [];
 let unproductiveSessionStart = null;
 let unproductiveNotified = false;
@@ -361,20 +363,16 @@ let lastUnproductiveApp = null;
 function loadNotificationSettings() {
   try {
     const raw = localStorage.getItem(NOTIFY_SETTINGS_KEY);
-    console.log('[Settings] Loaded from storage:', raw);
-    if (!raw) {
-      console.log('[Settings] No saved settings, using defaults');
-      return;
-    }
+    if (!raw) return;
     const parsed = JSON.parse(raw);
     notificationSettings = {
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : true,
       thresholdMinutes: typeof parsed.thresholdMinutes === 'number' ? parsed.thresholdMinutes : 5,
-      unit: parsed.unit || 'minutes'
+      unit: parsed.unit || 'minutes',
+      soundProfile: parsed.soundProfile || 'normal'
     };
-    console.log('[Settings] Loaded settings:', notificationSettings);
   } catch (e) {
-    console.error('[Settings] Error loading:', e);
+    // ignore
   }
 }
 
@@ -426,7 +424,8 @@ function updateNotificationSummary() {
   const enabled = notificationSettings.enabled ? 'On' : 'Off';
   const unit = notificationSettings.unit || 'minutes';
   const threshold = notificationSettings.thresholdMinutes || 5;
-  notifySummary.textContent = `Alerts ${enabled} • Notify after ${threshold} ${unit} of continuous unproductive time.`;
+  const sound = notificationSettings.soundProfile || 'normal';
+  notifySummary.textContent = `Alerts ${enabled} • Notify after ${threshold} ${unit} of continuous unproductive time • Sound: ${sound}.`;
 }
 
 function renderDistractionReports() {
@@ -457,6 +456,7 @@ loadDistractionReports();
 if (notifyToggle) notifyToggle.checked = !!notificationSettings.enabled;
 if (notifyThresholdInput) notifyThresholdInput.value = notificationSettings.thresholdMinutes || 5;
 if (notifyUnitSelect) notifyUnitSelect.value = notificationSettings.unit || 'minutes';
+if (notifySoundProfile) notifySoundProfile.value = notificationSettings.soundProfile || 'normal';
 updateNotificationSummary();
 renderDistractionReports();
 
@@ -467,8 +467,9 @@ if (notifyToggle) notifyToggle.addEventListener('change', () => {
   updateNotificationSummary();
 });
 if (notifyThresholdInput) notifyThresholdInput.addEventListener('change', () => {
-  const val = parseInt(notifyThresholdInput.value) || 0;
-  notificationSettings.thresholdMinutes = val;
+  const val = parseInt(notifyThresholdInput.value, 10);
+  notificationSettings.thresholdMinutes = Number.isFinite(val) && val > 0 ? val : 1;
+  notifyThresholdInput.value = String(notificationSettings.thresholdMinutes);
   saveNotificationSettings();
   updateNotificationSummary();
 });
@@ -477,6 +478,123 @@ if (notifyUnitSelect) notifyUnitSelect.addEventListener('change', () => {
   saveNotificationSettings();
   updateNotificationSummary();
 });
+if (notifySoundProfile) notifySoundProfile.addEventListener('change', () => {
+  notificationSettings.soundProfile = notifySoundProfile.value || 'normal';
+  saveNotificationSettings();
+  updateNotificationSummary();
+});
+
+let productivityAudioCtx = null;
+let lastAlertSoundAt = 0;
+
+function getSoundProfileConfig(profile) {
+  if (profile === 'soft') {
+    return {
+      tones: [620, 740, 880],
+      starts: [0.00, 0.18, 0.36],
+      lengths: [0.16, 0.16, 0.22],
+      gainPeak: 0.09,
+      wave: 'sine'
+    };
+  }
+
+  if (profile === 'intense') {
+    return {
+      tones: [880, 1175, 1568, 1175],
+      starts: [0.00, 0.12, 0.26, 0.44],
+      lengths: [0.11, 0.11, 0.13, 0.20],
+      gainPeak: 0.24,
+      wave: 'square'
+    };
+  }
+
+  return {
+    tones: [740, 880, 1175, 880],
+    starts: [0.00, 0.14, 0.30, 0.48],
+    lengths: [0.12, 0.12, 0.14, 0.20],
+    gainPeak: 0.18,
+    wave: 'triangle'
+  };
+}
+
+function playProductivityAlertSound(profile = notificationSettings.soundProfile || 'normal') {
+  try {
+    const now = Date.now();
+    if (now - lastAlertSoundAt < 1200) return;
+    lastAlertSoundAt = now;
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!productivityAudioCtx) productivityAudioCtx = new AudioCtx();
+    const ctx = productivityAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+    const config = getSoundProfileConfig(profile);
+    const tones = config.tones;
+    const starts = config.starts;
+    const lengths = config.lengths;
+    const base = ctx.currentTime + 0.02;
+
+    for (let i = 0; i < tones.length; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = config.wave;
+      osc.frequency.value = tones[i];
+      gain.gain.value = 0.0001;
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const startAt = base + starts[i];
+      const endAt = startAt + lengths[i];
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(config.gainPeak, startAt + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
+
+      osc.start(startAt);
+      osc.stop(endAt + 0.02);
+    }
+  } catch (e) {
+    // ignore sound errors
+  }
+}
+
+function openDistractionModal(app) {
+  lastUnproductiveApp = app;
+  if (!distractedModal) return;
+
+  const checked = document.querySelector('input[name="distractReason"]:checked');
+  if (checked) checked.checked = false;
+  if (distractNote) distractNote.value = '';
+  distractedModal.style.display = 'block';
+}
+
+if (window.api?.onNotificationClicked) {
+  console.log("[Renderer] Setting up notification click listener");
+  window.api.onNotificationClicked(() => {
+    console.log("[Renderer] Notification clicked! Opening distraction modal");
+    openDistractionModal(lastUnproductiveApp || currentWindowName || 'Distracting app');
+  });
+}
+
+if (notifyTestBtn) {
+  notifyTestBtn.addEventListener('click', () => {
+    const title = 'Time to Refocus (Test)';
+    const selectedProfile = notificationSettings.soundProfile || 'normal';
+    const body = 'You\'ve been on a distracting app for 1 minute. Click this to log why you got distracted.';
+    const testApp = 'Test Session - Productivity Alert';
+    playProductivityAlertSound(selectedProfile);
+    if (window.api?.showUnproductiveNotification) {
+      window.api.showUnproductiveNotification({ title, body }).catch(() => {});
+    }
+
+    // Exercise distraction report flow without waiting for timer threshold.
+    unproductiveSessionStart = Date.now() - 60000;
+    openDistractionModal(testApp);
+  });
+}
 
 if (clearReportHistoryBtn) {
   clearReportHistoryBtn.addEventListener('click', () => {
@@ -506,9 +624,9 @@ if (distractSubmitBtn) {
 
 function triggerUnproductiveNotification(app, durationMinutes) {
   try {
-    const title = 'Unproductive time detected';
-    const body = `You've been on unproductive activities for ${durationMinutes} minute(s) — ${app}`;
-    console.log('[Notification] Attempting to trigger:', { title, body, app, durationMinutes });
+    const title = 'Time to Refocus';
+    const body = `You've been on ${app} for ${durationMinutes} minute(s). Click to log why you got distracted.`;
+    playProductivityAlertSound(notificationSettings.soundProfile || 'normal');
     if (window.api?.showUnproductiveNotification) {
       window.api.showUnproductiveNotification({ title, body }).catch(err => {
         console.error('[Notification] IPC notification error:', err);
@@ -524,18 +642,7 @@ function triggerUnproductiveNotification(app, durationMinutes) {
     console.error('[Notification] Exception:', e);
   }
 
-  // Show in-app prompt
-  lastUnproductiveApp = app;
-  if (distractedModal) {
-    console.log('[Distraction Modal] Showing distraction modal');
-    // clear previous selections
-    const checked = document.querySelector('input[name="distractReason"]:checked');
-    if (checked) checked.checked = false;
-    if (distractNote) distractNote.value = '';
-    distractedModal.style.display = 'block';
-  } else {
-    console.log('[Distraction Modal] Modal element not found!');
-  }
+  openDistractionModal(app);
 }
 
 function setAppRulesNotice(message) {
@@ -953,7 +1060,6 @@ addLogHeader();
 window.api.onUpdate((data) => {
   const now = new Date();
   currentWindowName = data.current || "No active window";
-  console.log('[onUpdate] Window changed to:', currentWindowName);
 
   if (!isTrackerWindow(currentWindowName)) {
     lastNonTrackerWindowName = currentWindowName;
@@ -968,15 +1074,12 @@ window.api.onUpdate((data) => {
   // Unproductive session detection for alerts
   if (!isTrackerWindow(currentWindowName) && notificationSettings.enabled) {
     const currentCategoryForNotify = categorizeApp(currentWindowName);
-    console.log('[onUpdate] Unproductive detection - Category:', currentCategoryForNotify);
 
     if (currentCategoryForNotify === 'unproductive') {
       if (!unproductiveSessionStart) {
-        console.log('[onUpdate] Starting new unproductive session');
         unproductiveSessionStart = now.getTime();
         unproductiveNotified = false;
         lastUnproductiveApp = currentWindowName;
-        console.log('[onUpdate] Session info:', { start: unproductiveSessionStart, app: lastUnproductiveApp });
       }
 
       if (!unproductiveNotified) {
@@ -1030,23 +1133,11 @@ window.api.onUpdate((data) => {
 
 // === Periodic check for continuous unproductive sessions ===
 // Catches long sessions on same app where window changes don't trigger onUpdate()
-let timerCheckCount = 0;
 setInterval(() => {
   try {
-    timerCheckCount++;
-    console.log(`[Timer Check #${timerCheckCount}]`, {
-      enabled: notificationSettings.enabled,
-      currentWindow: currentWindowName,
-      isTracker: isTrackerWindow(currentWindowName),
-      sessionStart: unproductiveSessionStart,
-      alreadyNotified: unproductiveNotified
-    });
-    
     if (!notificationSettings.enabled || !currentWindowName || isTrackerWindow(currentWindowName)) return;
     
     const currentCategory = categorizeApp(currentWindowName);
-    console.log(`[Timer Check #${timerCheckCount}] Category for "${currentWindowName}":`, currentCategory);
-    
     if (currentCategory !== 'unproductive' || !unproductiveSessionStart || unproductiveNotified) return;
     
     const threshold = notificationSettings.thresholdMinutes || 5;
@@ -1054,22 +1145,13 @@ setInterval(() => {
       ? threshold * 60 * 60 * 1000
       : threshold * 60 * 1000);
     const elapsed = Date.now() - unproductiveSessionStart;
-    
-    console.log(`[Timer Check #${timerCheckCount}] Threshold check:`, {
-      threshold: threshold + ' ' + notificationSettings.unit,
-      thresholdMs: thresholdMs,
-      elapsedMs: elapsed,
-      elapsedMinutes: Math.round(elapsed / 60000),
-      shouldTrigger: thresholdMs > 0 && elapsed >= thresholdMs
-    });
-    
+
     if (thresholdMs > 0 && elapsed >= thresholdMs) {
-      console.log(`[Timer Check #${timerCheckCount}] TRIGGERING NOTIFICATION!`);
       triggerUnproductiveNotification(lastUnproductiveApp || currentWindowName, Math.max(1, Math.round(elapsed / 60000)));
       unproductiveNotified = true;
     }
   } catch (e) {
-    console.error(`[Timer Check] Error:`, e);
+    // ignore timer errors
   }
 }, 30000); // Check every 30 seconds
 

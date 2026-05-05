@@ -327,6 +327,8 @@ h3 {
 .notification-settings label { font-weight: 600; color: #334155; }
 .notification-settings input[type="number"] { width: 80px; padding: 6px; }
 .notification-settings select { padding: 6px; }
+.notification-settings #notifySoundProfile { min-width: 120px; }
+.notification-settings .notification-test-row { justify-content: flex-end; }
 .notification-summary {
   margin-top: 8px;
   font-size: 0.72rem;
