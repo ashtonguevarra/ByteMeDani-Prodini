@@ -13,12 +13,29 @@ const activeBreakBar = document.getElementById("activeBreakBar");
 const breakTimerDisplay = document.getElementById("breakTimerDisplay");
 const endBreakBtn = document.getElementById("endBreakBtn");
 const breakMinutesInput = document.getElementById("breakMinutesInput");
+const overrideCurrentAppEl = document.getElementById("overrideCurrentApp");
+const overrideStatusEl = document.getElementById("overrideStatus");
+const overrideTargetAppSelect = document.getElementById("overrideTargetApp");
+const useLastActiveAppBtn = document.getElementById("useLastActiveAppBtn");
+const markProductiveBtn = document.getElementById("markProductiveBtn");
+const markUnproductiveBtn = document.getElementById("markUnproductiveBtn");
+const markRestBtn = document.getElementById("markRestBtn");
+const markUnknownBtn = document.getElementById("markUnknownBtn");
+const clearCurrentOverrideBtn = document.getElementById("clearCurrentOverrideBtn");
+const appKeywordInput = document.getElementById("appKeywordInput");
+const addProductiveKeywordBtn = document.getElementById("addProductiveKeywordBtn");
+const addUnproductiveKeywordBtn = document.getElementById("addUnproductiveKeywordBtn");
+const appRulesList = document.getElementById("appRulesList");
+const appRulesEmpty = document.getElementById("appRulesEmpty");
 
 let activityChart = null;
 let weeklyChart = null;
 let monthlyChart = null;
 let weeklyChartFull = null;
 let monthlyChartFull = null;
+let sessionOverrides = {};
+let recentOverrideTargets = [];
+let lastNonTrackerWindowName = "";
 
 // Break timer variables
 let breakActive = false;
@@ -34,6 +51,7 @@ let customColors = {
   productive: "#4caf50",
   unproductive: "#f44336",
   rest: "#ff9800",
+  unknown: "#9e9e9e",
   background: "#ffffff",
   text: "#000000"
 };
@@ -197,30 +215,311 @@ applyColorsBtn.onclick = () => {
 };
 
 // Category mapping
-const productiveApps = [
+const DEFAULT_PRODUCTIVE_APPS = [
   'vscode', 'visual studio', 'cursor', 'intellij', 'pycharm', 
-  'terminal', 'notion', 'figma', 'excel', 'word', 'code', 'brave', 'chrome', 'firefox'
+  'terminal', 'notion', 'figma', 'excel', 'word', 'code', 'brave', 'chrome', 'firefox',
+  'github', 'gitlab', 'slack', 'teams', 'zoom', 'meet', 'gmail', 'outlook', 'drive',
+  'docs', 'sheets', 'slides', 'postman', 'insomnia', 'jupyter', 'android studio',
+  'xcode', 'datagrip', 'webstorm', 'sublime text', 'obsidian'
 ];
 
-const unproductiveApps = [
+const DEFAULT_UNPRODUCTIVE_APPS = [
   'youtube', 'twitter', 'facebook', 'instagram', 'reddit', 
-  'twitch', 'tiktok', 'netflix', 'hulu'
+  'twitch', 'tiktok', 'netflix', 'hulu', 'snapchat', 'threads', 'pinterest', 'messenger'
 ];
+
+let productiveApps = [...DEFAULT_PRODUCTIVE_APPS];
+let unproductiveApps = [...DEFAULT_UNPRODUCTIVE_APPS];
 
 const restApps = [
   'calendar', 'reminders', 'clock', 'alarm', 'settings', 
   'spotify', 'music', 'apple music'
 ];
 
+const APP_RULES_STORAGE_KEY = "tracker.appRules.v1";
+
+function normalizeKeyword(value) {
+  return (value || "").toLowerCase().trim();
+}
+
+function dedupeKeywords(list) {
+  return [...new Set((list || []).map(normalizeKeyword).filter(Boolean))];
+}
+
+function loadAppRulesFromStorage() {
+  try {
+    const raw = localStorage.getItem(APP_RULES_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+
+    const savedProductive = dedupeKeywords(parsed.productive);
+    const savedUnproductive = dedupeKeywords(parsed.unproductive);
+
+    productiveApps = savedProductive.length ? savedProductive : [...DEFAULT_PRODUCTIVE_APPS];
+    unproductiveApps = savedUnproductive.length ? savedUnproductive : [...DEFAULT_UNPRODUCTIVE_APPS];
+
+    unproductiveApps = unproductiveApps.filter(app => !productiveApps.includes(app));
+  } catch {
+    productiveApps = [...DEFAULT_PRODUCTIVE_APPS];
+    unproductiveApps = [...DEFAULT_UNPRODUCTIVE_APPS];
+  }
+}
+
+function saveAppRulesToStorage() {
+  const payload = {
+    productive: dedupeKeywords(productiveApps),
+    unproductive: dedupeKeywords(unproductiveApps)
+  };
+  localStorage.setItem(APP_RULES_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function removeKeywordFromRules(keyword) {
+  productiveApps = productiveApps.filter(app => app !== keyword);
+  unproductiveApps = unproductiveApps.filter(app => app !== keyword);
+}
+
+function setKeywordCategory(keyword, category, isChecked) {
+  const normalized = normalizeKeyword(keyword);
+  if (!normalized) return;
+
+  if (category === "productive") {
+    if (isChecked) {
+      if (!productiveApps.includes(normalized)) productiveApps.push(normalized);
+      unproductiveApps = unproductiveApps.filter(app => app !== normalized);
+    } else {
+      productiveApps = productiveApps.filter(app => app !== normalized);
+    }
+  }
+
+  if (category === "unproductive") {
+    if (isChecked) {
+      if (!unproductiveApps.includes(normalized)) unproductiveApps.push(normalized);
+      productiveApps = productiveApps.filter(app => app !== normalized);
+    } else {
+      unproductiveApps = unproductiveApps.filter(app => app !== normalized);
+    }
+  }
+
+  saveAppRulesToStorage();
+  renderAppRulesEditor();
+}
+
+function addKeywordToCategory(category) {
+  const normalized = normalizeKeyword(appKeywordInput?.value || "");
+  if (!normalized) return;
+
+  if (category === "productive") {
+    if (!productiveApps.includes(normalized)) productiveApps.push(normalized);
+    unproductiveApps = unproductiveApps.filter(app => app !== normalized);
+  }
+
+  if (category === "unproductive") {
+    if (!unproductiveApps.includes(normalized)) unproductiveApps.push(normalized);
+    productiveApps = productiveApps.filter(app => app !== normalized);
+  }
+
+  saveAppRulesToStorage();
+  renderAppRulesEditor();
+  if (appKeywordInput) appKeywordInput.value = "";
+}
+
+function renderAppRulesEditor() {
+  if (!appRulesList || !appRulesEmpty) return;
+
+  const keywords = [...new Set([...productiveApps, ...unproductiveApps])].sort();
+  appRulesList.innerHTML = "";
+  appRulesEmpty.style.display = keywords.length ? "none" : "block";
+
+  for (const keyword of keywords) {
+    const row = document.createElement("div");
+    row.className = "app-rule-row";
+    row.innerHTML = `
+      <span class="app-rule-name" title="${keyword}">${keyword}</span>
+      <div class="app-rule-check">
+        <input type="checkbox" data-keyword="${keyword}" data-category="productive" ${productiveApps.includes(keyword) ? "checked" : ""}>
+      </div>
+      <div class="app-rule-check">
+        <input type="checkbox" data-keyword="${keyword}" data-category="unproductive" ${unproductiveApps.includes(keyword) ? "checked" : ""}>
+      </div>
+      <button class="app-rule-remove" data-remove="${keyword}">Remove</button>
+    `;
+    appRulesList.appendChild(row);
+  }
+}
+
+loadAppRulesFromStorage();
+
+function getCategoryLabel(category) {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
+function isTrackerWindow(windowTitle) {
+  const lower = (windowTitle || "").toLowerCase();
+  return lower.includes("electron") || lower.includes("tracker");
+}
+
+function registerOverrideTarget(windowTitle) {
+  if (!windowTitle || isTrackerWindow(windowTitle)) return;
+
+  const { appName } = extractAppAndTitle(windowTitle);
+  const appKey = appName.toLowerCase().trim();
+  if (!appKey) return;
+
+  recentOverrideTargets = recentOverrideTargets.filter(target => target.key !== appKey);
+  recentOverrideTargets.unshift({ key: appKey, label: appName });
+  if (recentOverrideTargets.length > 30) {
+    recentOverrideTargets = recentOverrideTargets.slice(0, 30);
+  }
+}
+
+function refreshOverrideTargetOptions(preferredKey) {
+  if (!overrideTargetAppSelect) return;
+
+  const currentValue = preferredKey || overrideTargetAppSelect.value;
+  overrideTargetAppSelect.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select app to override";
+  overrideTargetAppSelect.appendChild(placeholder);
+
+  for (const target of recentOverrideTargets) {
+    const option = document.createElement("option");
+    option.value = target.key;
+    option.textContent = target.label;
+    overrideTargetAppSelect.appendChild(option);
+  }
+
+  if (currentValue && recentOverrideTargets.some(target => target.key === currentValue)) {
+    overrideTargetAppSelect.value = currentValue;
+  }
+}
+
+function getSelectedOverrideTargetKey() {
+  if (!overrideTargetAppSelect) return null;
+  const selected = (overrideTargetAppSelect.value || "").trim();
+  return selected || null;
+}
+
+function getAppOverride(windowTitle) {
+  const { appName } = extractAppAndTitle(windowTitle || "");
+  const appKey = appName.toLowerCase().trim();
+  if (!appKey) return null;
+  return sessionOverrides[appKey] || null;
+}
+
 function categorizeApp(appName) {
   if (breakActive) return 'rest';
+
+  const appOverride = getAppOverride(appName);
+  if (appOverride) return appOverride;
   
   appName = appName.toLowerCase();
+
+  const educationalKeywords = [
+    'tutorial', 'lesson', 'lecture', 'course', 'class',
+    'walkthrough', 'how to', 'documentation', 'docs', 'guide', 'webinar'
+  ];
+
+  const learningIntent = educationalKeywords.some(keyword => appName.includes(keyword));
+
+  if (
+    (appName.includes('youtube') || appName.includes('facebook') || appName.includes('reddit')) &&
+    learningIntent
+  ) {
+    return 'productive';
+  }
+
   for (const app of productiveApps) if (appName.includes(app)) return 'productive';
   for (const app of unproductiveApps) if (appName.includes(app)) return 'unproductive';
   for (const app of restApps) if (appName.includes(app)) return 'rest';
-  return 'productive';
+  return 'unknown';
 }
+
+function updateOverrideStatus() {
+  if (!overrideCurrentAppEl || !overrideStatusEl) return;
+
+  const targetKey = getSelectedOverrideTargetKey();
+  const target = targetKey ? recentOverrideTargets.find(item => item.key === targetKey) : null;
+  overrideCurrentAppEl.textContent = target?.label || "No target selected";
+
+  const currentOverride = targetKey ? sessionOverrides[targetKey] : null;
+  overrideStatusEl.textContent = currentOverride
+    ? `Manual override active: ${getCategoryLabel(currentOverride)}`
+    : "No manual override for selected app.";
+}
+
+function applyOverrideToSelectedApp(category) {
+  const targetKey = getSelectedOverrideTargetKey();
+  if (!targetKey) return;
+
+  sessionOverrides[targetKey] = category;
+  updateOverrideStatus();
+}
+
+function clearOverrideForSelectedApp() {
+  const targetKey = getSelectedOverrideTargetKey();
+  if (!targetKey) return;
+
+  delete sessionOverrides[targetKey];
+  updateOverrideStatus();
+}
+
+if (markProductiveBtn) markProductiveBtn.addEventListener("click", () => applyOverrideToSelectedApp("productive"));
+if (markUnproductiveBtn) markUnproductiveBtn.addEventListener("click", () => applyOverrideToSelectedApp("unproductive"));
+if (markRestBtn) markRestBtn.addEventListener("click", () => applyOverrideToSelectedApp("rest"));
+if (markUnknownBtn) markUnknownBtn.addEventListener("click", () => applyOverrideToSelectedApp("unknown"));
+if (clearCurrentOverrideBtn) clearCurrentOverrideBtn.addEventListener("click", clearOverrideForSelectedApp);
+if (addProductiveKeywordBtn) addProductiveKeywordBtn.addEventListener("click", () => addKeywordToCategory("productive"));
+if (addUnproductiveKeywordBtn) addUnproductiveKeywordBtn.addEventListener("click", () => addKeywordToCategory("unproductive"));
+if (appKeywordInput) {
+  appKeywordInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addKeywordToCategory("productive");
+    }
+  });
+}
+
+if (appRulesList) {
+  appRulesList.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    const keyword = target.dataset.keyword;
+    const category = target.dataset.category;
+    if (!keyword || !category) return;
+
+    setKeywordCategory(keyword, category, target.checked);
+  });
+
+  appRulesList.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const removeKeyword = target.dataset.remove;
+    if (!removeKeyword) return;
+
+    removeKeywordFromRules(removeKeyword);
+    saveAppRulesToStorage();
+    renderAppRulesEditor();
+  });
+}
+
+if (overrideTargetAppSelect) overrideTargetAppSelect.addEventListener("change", updateOverrideStatus);
+if (useLastActiveAppBtn) {
+  useLastActiveAppBtn.addEventListener("click", () => {
+    if (!lastNonTrackerWindowName) return;
+
+    const { appName } = extractAppAndTitle(lastNonTrackerWindowName);
+    const appKey = appName.toLowerCase().trim();
+    if (!appKey) return;
+
+    registerOverrideTarget(lastNonTrackerWindowName);
+    refreshOverrideTargetOptions(appKey);
+    updateOverrideStatus();
+  });
+}
+
+renderAppRulesEditor();
 
 // Extract app name and tab title from window title - SWAPPED priority
 function extractAppAndTitle(windowTitle) {
@@ -270,7 +569,7 @@ function extractAppAndTitle(windowTitle) {
 }
 
 // Time tracking
-let timeSpent = { productive: 0, unproductive: 0, rest: 0 };
+let timeSpent = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
 let weeklyData = {};
 let monthlyData = {};
 let lastEntry = null;
@@ -282,6 +581,16 @@ addLogHeader();
 window.api.onUpdate((data) => {
   const now = new Date();
   currentWindowName = data.current || "No active window";
+
+  if (!isTrackerWindow(currentWindowName)) {
+    lastNonTrackerWindowName = currentWindowName;
+    const { appName } = extractAppAndTitle(currentWindowName);
+    const appKey = appName.toLowerCase().trim();
+    registerOverrideTarget(currentWindowName);
+    refreshOverrideTargetOptions(getSelectedOverrideTargetKey() || appKey);
+  }
+
+  updateOverrideStatus();
   
   if (lastEntry && lastTimestamp && lastEntry !== currentWindowName) {
     const timeDiff = (now - lastTimestamp) / 1000 / 60;
@@ -289,11 +598,11 @@ window.api.onUpdate((data) => {
     timeSpent[category] += timeDiff;
     
     const dateKey = now.toDateString();
-    if (!weeklyData[dateKey]) weeklyData[dateKey] = { productive: 0, unproductive: 0, rest: 0 };
+    if (!weeklyData[dateKey]) weeklyData[dateKey] = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
     weeklyData[dateKey][category] += timeDiff;
     
     const monthKey = `${now.getFullYear()}-${now.getMonth()}`;
-    if (!monthlyData[monthKey]) monthlyData[monthKey] = { productive: 0, unproductive: 0, rest: 0 };
+    if (!monthlyData[monthKey]) monthlyData[monthKey] = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
     monthlyData[monthKey][category] += timeDiff;
   }
   
@@ -335,18 +644,22 @@ window.addEventListener('resize', () => {
 function updateChart() {
   const ctx = document.getElementById('activityChart').getContext('2d');
   updateChartSize();
+  const chartLabels = ['Productive', 'Unproductive', 'Rest', 'Unknown'];
+  const chartData = [timeSpent.productive, timeSpent.unproductive, timeSpent.rest, timeSpent.unknown];
   
   if (activityChart) {
-    activityChart.data.datasets[0].data = [timeSpent.productive, timeSpent.unproductive, timeSpent.rest];
+    activityChart.data.labels = chartLabels;
+    activityChart.data.datasets[0].data = chartData;
+    activityChart.data.datasets[0].backgroundColor = [customColors.productive, customColors.unproductive, customColors.rest, customColors.unknown];
     activityChart.update();
   } else {
     activityChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: ['Productive', 'Unproductive', 'Rest'],
+        labels: chartLabels,
         datasets: [{
-          data: [timeSpent.productive, timeSpent.unproductive, timeSpent.rest],
-          backgroundColor: [customColors.productive, customColors.unproductive, customColors.rest],
+          data: chartData,
+          backgroundColor: [customColors.productive, customColors.unproductive, customColors.rest, customColors.unknown],
           borderWidth: 1,
           radius: '90%'
         }]
@@ -360,7 +673,7 @@ function updateChart() {
             callbacks: { 
               label: (context) => {
                 const value = context.raw || 0;
-                const total = timeSpent.productive + timeSpent.unproductive + timeSpent.rest;
+                const total = timeSpent.productive + timeSpent.unproductive + timeSpent.rest + timeSpent.unknown;
                 const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                 const hours = Math.floor(value / 60);
                 const mins = Math.floor(value % 60);
@@ -405,6 +718,13 @@ function updateLegend() {
           <span class="legend-label">Rest</span>
         </div>
         <span class="legend-time">${formatTime(timeSpent.rest)}</span>
+      </div>
+      <div class="legend-item">
+        <div style="display:flex; align-items:center;">
+          <div class="legend-color" style="background: ${customColors.unknown}"></div>
+          <span class="legend-label">Unknown</span>
+        </div>
+        <span class="legend-time">${formatTime(timeSpent.unknown)}</span>
       </div>
     `;
   }
@@ -454,7 +774,8 @@ function updateWeeklyCharts() {
     day: day,
     productive: weeklyData[day]?.productive || 0,
     unproductive: weeklyData[day]?.unproductive || 0,
-    rest: weeklyData[day]?.rest || 0
+    rest: weeklyData[day]?.rest || 0,
+    unknown: weeklyData[day]?.unknown || 0
   }));
   
   const ctx = document.getElementById('weeklyChart').getContext('2d');
@@ -467,7 +788,8 @@ function updateWeeklyCharts() {
       datasets: [
         { label: 'Productive', data: weeklyDataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: 'Unproductive', data: weeklyDataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: 'Rest', data: weeklyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
+        { label: 'Rest', data: weeklyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
+        { label: 'Unknown', data: weeklyDataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
       ]
     },
     options: { 
@@ -487,7 +809,8 @@ function updateMonthlyCharts() {
     week: week,
     productive: monthlyData[week]?.productive || 0,
     unproductive: monthlyData[week]?.unproductive || 0,
-    rest: monthlyData[week]?.rest || 0
+    rest: monthlyData[week]?.rest || 0,
+    unknown: monthlyData[week]?.unknown || 0
   }));
   
   const ctx = document.getElementById('monthlyChart').getContext('2d');
@@ -500,7 +823,8 @@ function updateMonthlyCharts() {
       datasets: [
         { label: 'Productive', data: monthlyDataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: 'Unproductive', data: monthlyDataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: 'Rest', data: monthlyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
+        { label: 'Rest', data: monthlyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
+        { label: 'Unknown', data: monthlyDataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
       ]
     },
     options: { 
@@ -520,7 +844,8 @@ function updateWeeklyFullView() {
     day: day,
     productive: weeklyData[day]?.productive || 0,
     unproductive: weeklyData[day]?.unproductive || 0,
-    rest: weeklyData[day]?.rest || 0
+    rest: weeklyData[day]?.rest || 0,
+    unknown: weeklyData[day]?.unknown || 0
   }));
   
   const ctx = document.getElementById('weeklyChartFull').getContext('2d');
@@ -533,7 +858,8 @@ function updateWeeklyFullView() {
       datasets: [
         { label: 'Productive', data: weeklyDataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: 'Unproductive', data: weeklyDataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: 'Rest', data: weeklyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
+        { label: 'Rest', data: weeklyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
+        { label: 'Unknown', data: weeklyDataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
       ]
     },
     options: { 
@@ -550,7 +876,8 @@ function updateMonthlyFullView() {
     week: week,
     productive: monthlyData[week]?.productive || 0,
     unproductive: monthlyData[week]?.unproductive || 0,
-    rest: monthlyData[week]?.rest || 0
+    rest: monthlyData[week]?.rest || 0,
+    unknown: monthlyData[week]?.unknown || 0
   }));
   
   const ctx = document.getElementById('monthlyChartFull').getContext('2d');
@@ -563,7 +890,8 @@ function updateMonthlyFullView() {
       datasets: [
         { label: 'Productive', data: monthlyDataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: 'Unproductive', data: monthlyDataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: 'Rest', data: monthlyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
+        { label: 'Rest', data: monthlyDataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
+        { label: 'Unknown', data: monthlyDataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
       ]
     },
     options: { 

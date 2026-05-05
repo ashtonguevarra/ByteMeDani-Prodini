@@ -152,6 +152,49 @@
           <input type="color" id="textColor" value="#000000">
         </div>
       </div>
+
+      <div class="settings-two-column">
+        <div class="settings-card">
+          <div class="settings-section-title">Manual Classification Override (Session)</div>
+          <div class="manual-override-bar settings-override-panel">
+            <div class="override-current">
+              Override Target: <span id="overrideCurrentApp">No target selected</span>
+            </div>
+            <div class="override-target-row">
+              <select id="overrideTargetApp" class="override-select"></select>
+              <button id="useLastActiveAppBtn" class="override-btn clear">Use Last Active App</button>
+            </div>
+            <div class="override-actions">
+              <button id="markProductiveBtn" class="override-btn productive">Productive</button>
+              <button id="markUnproductiveBtn" class="override-btn unproductive">Unproductive</button>
+              <button id="markRestBtn" class="override-btn rest">Rest</button>
+              <button id="markUnknownBtn" class="override-btn unknown">Unknown</button>
+              <button id="clearCurrentOverrideBtn" class="override-btn clear">Clear Override</button>
+            </div>
+            <div id="overrideStatus" class="override-status">No manual override for this app.</div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-section-title">App Classification Rules</div>
+          <div class="app-rules-panel">
+            <div class="app-rules-add-row">
+              <input id="appKeywordInput" class="app-rules-input" type="text" placeholder="e.g. linkedin, udemy, discord">
+              <button id="addProductiveKeywordBtn" class="app-rule-add-btn productive">Add Productive</button>
+              <button id="addUnproductiveKeywordBtn" class="app-rule-add-btn unproductive">Add Unproductive</button>
+            </div>
+            <div class="app-rules-header">
+              <span class="app-col-name">App Keyword</span>
+              <span class="app-col-check">Productive</span>
+              <span class="app-col-check">Unproductive</span>
+              <span class="app-col-action">Remove</span>
+            </div>
+            <div id="appRulesList" class="app-rules-list"></div>
+            <div id="appRulesEmpty" class="app-rules-empty">No custom rules yet. Add one above.</div>
+          </div>
+        </div>
+      </div>
+
       <button id="applyColors" class="apply-btn">Apply</button>
     </div>
   </div>
