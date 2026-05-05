@@ -1,17 +1,162 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Activity Tracker</title>
-  <link rel="stylesheet" href = "style.css">
+  <title>Activity Tracker Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <h2>Current Focus</h2>
-  <div id="current">Initializing...</div>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <button class="sidebar-toggle" id="sidebarToggle">◀</button>
+      <div class="sidebar-content">
+        <div class="sidebar-header">
+          <h2>Tracker</h2>
+        </div>
+        <nav class="sidebar-nav">
+          <button class="nav-btn active" data-view="home">Home</button>
+          <button class="nav-btn" data-view="weekly">Weekly</button>
+          <button class="nav-btn" data-view="monthly">Monthly</button>
+        </nav>
+        <div class="sidebar-footer">
+          <button id="colorPaletteBtn" class="color-palette-btn">Customize</button>
+        </div>
+      </div>
+    </div>
 
-  <h3>Recent Activity</h3>
-  <div id="log"></div>
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Today's Dashboard View -->
+      <div id="homeView" class="view active">
+        <!-- Top Bar with Date and Break Button -->
+        <div class="top-bar">
+          <div class="date-display" id="dateDisplay"></div>
+          <button id="takeBreakBtn" class="take-break-btn">Take a Break</button>
+        </div>
 
+        <!-- Break Modal -->
+        <div id="breakModal" class="break-modal">
+          <div class="break-modal-content">
+            <h3>Take a Break</h3>
+            <input type="number" id="breakMinutesInput" placeholder="Minutes" min="1" max="180" value="15">
+            <div class="break-modal-buttons">
+              <button id="confirmBreakBtn" class="confirm-break-btn">Start Break</button>
+              <button id="cancelBreakBtn" class="cancel-break-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
 
+        <!-- Active Break Bar -->
+        <div id="activeBreakBar" class="active-break-bar" style="display: none;">
+          <span>🍵 Break in progress:</span>
+          <span id="breakTimerDisplay" class="break-timer-display"></span>
+          <button id="endBreakBtn" class="end-break-btn">End Break</button>
+        </div>
+
+        <div class="dashboard-layout">
+          <!-- Left Column: Activity Log (Main Focus) -->
+          <div class="log-container">
+            <h3>Activity Log</h3>
+            <div id="log"></div>
+          </div>
+
+          <!-- Right Column: Pie Chart & Summary -->
+          <div class="right-panel">
+            <div class="chart-wrapper">
+              <canvas id="activityChart" width="300" height="300"></canvas>
+              <div class="chart-legend" id="chartLegend"></div>
+            </div>
+
+            <!-- Summary UI (No functionality yet) -->
+            <div class="summary-section">
+              <h3>Summary</h3>
+              <div class="summary-placeholder">
+                <div class="summary-controls">
+                  <select id="summaryPeriod" class="summary-select">
+                    <option value="day">Last 24 hours</option>
+                    <option value="week">Last 7 days</option>
+                    <option value="month">Last 30 days</option>
+                  </select>
+                  <button id="generateSummaryBtn" class="summary-btn">Generate Report</button>
+                </div>
+                <div class="summary-content">
+                  <p class="summary-message">Summary will appear here</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly Summary (scroll down) -->
+        <div class="weekly-summary-section">
+          <h3>Weekly Overview</h3>
+          <canvas id="weeklyChart" width="800" height="250"></canvas>
+        </div>
+
+        <!-- Monthly Summary (scroll down) -->
+        <div class="monthly-summary-section">
+          <h3>Monthly Overview</h3>
+          <canvas id="monthlyChart" width="800" height="250"></canvas>
+        </div>
+      </div>
+
+      <!-- Weekly View (separate page) -->
+      <div id="weeklyView" class="view">
+        <h3>Weekly Details</h3>
+        <canvas id="weeklyChartFull" width="800" height="400"></canvas>
+      </div>
+
+      <!-- Monthly View (separate page) -->
+      <div id="monthlyView" class="view">
+        <h3>Monthly Details</h3>
+        <canvas id="monthlyChartFull" width="800" height="400"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Color Palette Modal -->
+  <div id="colorModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3>Customize</h3>
+      <div class="color-controls">
+        <div class="color-item">
+          <label>Font Size:</label>
+          <div class="font-controls-modal">
+            <button id="fontMinusModal">A-</button>
+            <span id="fontSizeModal">100%</span>
+            <button id="fontPlusModal">A+</button>
+          </div>
+        </div>
+        <div class="color-item">
+          <label>Productive:</label>
+          <input type="color" id="productiveColor" value="#4caf50">
+        </div>
+        <div class="color-item">
+          <label>Unproductive:</label>
+          <input type="color" id="unproductiveColor" value="#f44336">
+        </div>
+        <div class="color-item">
+          <label>Rest:</label>
+          <input type="color" id="restColor" value="#ff9800">
+        </div>
+        <div class="color-item">
+          <label>Background:</label>
+          <input type="color" id="bgColor" value="#ffffff">
+        </div>
+        <div class="color-item">
+          <label>Text:</label>
+          <input type="color" id="textColor" value="#000000">
+        </div>
+      </div>
+      <button id="applyColors" class="apply-btn">Apply</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
