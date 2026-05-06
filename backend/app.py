@@ -105,17 +105,15 @@ with app.app_context():
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 
-@app.route("/sessions/<int:session_id>/logs", methods=["GET"])
-def get_session_logs(session_id):
-    logs = ActivityLog.query.filter_by(session_id=session_id).order_by(ActivityLog.timestamp.asc()).all()
+@app.route("/sessions", methods=["GET"])
+def get_sessions():
+    sessions = Session.query.order_by(Session.started_at.desc()).all()
 
     return jsonify([
         {
-            "id": log.id,
-            "session_id": log.session_id,
-            "app_name": log.app_name,
-            "window_title": log.window_title,
-            "timestamp": log.timestamp.isoformat()
+            "id": s.id,
+            "started_at": s.started_at.isoformat() if s.started_at else None,
+            "ended_at": s.ended_at.isoformat() if s.ended_at else None
         }
-        for log in logs
+        for s in sessions
     ])

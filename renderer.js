@@ -10,6 +10,7 @@ const activeBreakBar = document.getElementById("activeBreakBar");
 const breakTimerDisplay = document.getElementById("breakTimerDisplay");
 const endBreakBtn = document.getElementById("endBreakBtn");
 const breakMinutesInput = document.getElementById("breakMinutesInput");
+const resetBtn = document.getElementById("resetLog");
 const logDiv = document.getElementById("log");
 const toggleTrackingBtn = document.getElementById("toggleTrackingBtn");
 
@@ -18,10 +19,6 @@ let weeklyChart = null;
 let monthlyChart = null;
 let weeklyChartFull = null;
 let monthlyChartFull = null;
-
-let sessionOverrides = {};
-let recentOverrideTargets = [];
-let lastNonTrackerWindowName = "";
 
 let breakActive = false;
 let breakInterval = null;
@@ -79,7 +76,7 @@ function updateDateDisplay() {
 updateDateDisplay();
 setInterval(updateDateDisplay, 1000);
 
-// Sidebar toggle
+// Sidebar
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebarToggle");
 
@@ -108,9 +105,7 @@ navBtns.forEach(btn => {
     btn.classList.add("active");
 
     const targetView = document.getElementById(`${view}View`);
-    if (targetView) {
-      targetView.classList.add("active");
-    }
+    if (targetView) targetView.classList.add("active");
 
     if (view === "weekly") updateWeeklyFullView();
     if (view === "monthly") updateMonthlyFullView();
@@ -172,8 +167,7 @@ function stopBreak() {
 function updateBreakTimer() {
   if (!breakActive || !breakEndTime) return;
 
-  const now = Date.now();
-  const timeLeft = breakEndTime - now;
+  const timeLeft = breakEndTime - Date.now();
 
   if (timeLeft <= 0) {
     stopBreak();
@@ -231,7 +225,7 @@ function updateFontSize() {
     fontSizeDisplay.textContent = currentFontSize + "%";
   }
 
-  document.documentElement.style.fontSize = (14 * currentFontSize / 100) + "px";
+  document.documentElement.style.fontSize = `${14 * currentFontSize / 100}px`;
 }
 
 // Color modal
@@ -263,6 +257,7 @@ if (applyColorsBtn) {
     customColors.text = document.getElementById("textColor").value;
 
     const mainContent = document.querySelector(".main-content");
+
     if (mainContent) {
       mainContent.style.background = customColors.background;
       mainContent.style.color = customColors.text;
@@ -274,7 +269,7 @@ if (applyColorsBtn) {
 
     modal.style.display = "none";
   };
-}
+};
 
 // Classification
 const DEFAULT_PRODUCTIVE_APPS = [
@@ -326,11 +321,6 @@ function extractAppAndTitle(windowTitle) {
   return { tabName, appName };
 }
 
-function isTrackerWindow(windowTitle) {
-  const lower = (windowTitle || "").toLowerCase();
-  return lower.includes("electron") || lower.includes("tracker");
-}
-
 function categorizeApp(appName) {
   if (breakActive) return "rest";
 
@@ -365,7 +355,7 @@ function categorizeApp(appName) {
   return "unknown";
 }
 
-// Session functions
+// Sessions
 async function startSession() {
   try {
     const res = await fetch("http://127.0.0.1:5000/sessions/start", {
@@ -373,8 +363,8 @@ async function startSession() {
     });
 
     const data = await res.json();
-    currentSessionId = data.session_id;
 
+    currentSessionId = data.session_id;
     localStorage.setItem("currentSessionId", currentSessionId);
 
     console.log("Started session:", currentSessionId);
@@ -403,7 +393,7 @@ async function stopSession() {
   }
 }
 
-// Database save
+// Save logs
 async function saveLogToDatabase(windowTitle) {
   if (!currentSessionId) {
     console.log("No session active, log skipped");
@@ -427,13 +417,12 @@ async function saveLogToDatabase(windowTitle) {
 
     const data = await res.json();
     console.log("Save log response:", data);
-
   } catch (err) {
     console.error("Failed to save log:", err);
   }
 }
 
-// History page
+// History
 async function loadSessions() {
   const historyLog = document.getElementById("historyLog");
   if (!historyLog) return;
@@ -468,7 +457,6 @@ async function loadSessions() {
       `;
 
       div.addEventListener("click", () => loadSessionLogs(session.id));
-
       historyLog.appendChild(div);
     });
   } catch (err) {
@@ -490,10 +478,7 @@ async function loadSessionLogs(sessionId) {
     const backBtn = document.createElement("button");
     backBtn.textContent = "← Back to Sessions";
     backBtn.className = "back-btn";
-    backBtn.addEventListener("click", () => {
-      loadSessions();
-    });
-
+    backBtn.addEventListener("click", loadSessions);
     historyLog.appendChild(backBtn);
 
     const title = document.createElement("h3");
@@ -519,7 +504,6 @@ async function loadSessionLogs(sessionId) {
 
       historyLog.appendChild(div);
     });
-
   } catch (err) {
     historyLog.innerHTML = "<p>Failed to load session logs.</p>";
     console.error("Failed to load logs:", err);
@@ -582,7 +566,7 @@ if (window.api && window.api.onUpdate) {
   });
 }
 
-// Add live log to Home page
+// Live log
 function addToLog(windowName, timestamp) {
   if (!logEl) return;
 
@@ -1036,7 +1020,7 @@ if (generateSummaryBtn) {
   });
 }
 
-// Existing Start / Stop button connected to sessions
+// Start / Stop button
 if (toggleTrackingBtn) {
   toggleTrackingBtn.addEventListener("click", async () => {
     if (!isTracking) {
