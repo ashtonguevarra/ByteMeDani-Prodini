@@ -105,15 +105,3 @@ with app.app_context():
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 
-@app.route("/sessions", methods=["GET"])
-def get_sessions():
-    sessions = Session.query.order_by(Session.started_at.desc()).all()
-
-    return jsonify([
-        {
-            "id": s.id,
-            "started_at": s.started_at.isoformat() if s.started_at else None,
-            "ended_at": s.ended_at.isoformat() if s.ended_at else None
-        }
-        for s in sessions
-    ])
