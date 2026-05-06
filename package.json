@@ -15,12 +15,12 @@
   },
 
   "dependencies": {
-    "active-win": "^8.2.1",
-    "concurrently": "^9.2.1",
+    "active-win": "^7.7.2",
     "wait-on": "^9.0.5"
   },
 
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "electron": "^41.5.0"
   }
 }
