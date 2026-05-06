@@ -7,41 +7,49 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
   <div class="app-container">
-    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
       <button class="sidebar-toggle" id="sidebarToggle">◀</button>
+
       <div class="sidebar-content">
         <div class="sidebar-header">
-          <h2>Tracker</h2>
+          <h2>Tracker</h2>  
         </div>
+
         <nav class="sidebar-nav">
           <button class="nav-btn active" data-view="home">Home</button>
+          <button class="nav-btn" data-view="history">History</button>
           <button class="nav-btn" data-view="weekly">Weekly</button>
           <button class="nav-btn" data-view="monthly">Monthly</button>
         </nav>
+
         <div class="sidebar-footer">
           <button id="colorPaletteBtn" class="color-palette-btn">Customize</button>
         </div>
       </div>
     </div>
 
-    <!-- Main Content -->
     <div class="main-content">
-      <!-- Today's Dashboard View -->
-      <div id="homeView" class="view active">
-        <!-- Top Bar with Date and Break Button -->
-        <div class="top-bar">
-          <div class="date-display" id="dateDisplay"></div>
-          <button id="takeBreakBtn" class="take-break-btn">Take a Break</button>
-        </div>
 
-        <!-- Break Modal -->
+      <!-- HOME VIEW -->
+      <div id="homeView" class="view active">
+      <div class="top-bar">
+        <div class="date-display" id="dateDisplay"></div>
+
+        <div class="top-bar-actions">
+      <button id="toggleTrackingBtn" class="session-btn">Start Session</button>
+     <button id="takeBreakBtn" class="take-break-btn">Take a Break</button>
+     <button id="resetLog" class = "reset-log-btn" >Reset</button>
+       </div>
+      </div>
+
         <div id="breakModal" class="break-modal">
           <div class="break-modal-content">
             <h3>Take a Break</h3>
             <input type="number" id="breakMinutesInput" placeholder="Minutes" min="1" max="180" value="15">
+
             <div class="break-modal-buttons">
               <button id="confirmBreakBtn" class="confirm-break-btn">Start Break</button>
               <button id="cancelBreakBtn" class="cancel-break-btn">Cancel</button>
@@ -49,7 +57,6 @@
           </div>
         </div>
 
-        <!-- Active Break Bar -->
         <div id="activeBreakBar" class="active-break-bar" style="display: none;">
           <span>🍵 Break in progress:</span>
           <span id="breakTimerDisplay" class="break-timer-display"></span>
@@ -57,22 +64,23 @@
         </div>
 
         <div class="dashboard-layout">
-          <!-- Left Column: Activity Log (Main Focus) -->
           <div class="log-container">
             <h3>Activity Log</h3>
+
             <div id="log"></div>
           </div>
 
-          <!-- Right Column: Pie Chart & Summary -->
+
+
           <div class="right-panel">
             <div class="chart-wrapper">
               <canvas id="activityChart" width="300" height="300"></canvas>
               <div class="chart-legend" id="chartLegend"></div>
             </div>
 
-            <!-- Summary UI (No functionality yet) -->
             <div class="summary-section">
               <h3>Summary</h3>
+
               <div class="summary-placeholder">
                 <div class="summary-controls">
                   <select id="summaryPeriod" class="summary-select">
@@ -80,8 +88,10 @@
                     <option value="week">Last 7 days</option>
                     <option value="month">Last 30 days</option>
                   </select>
+
                   <button id="generateSummaryBtn" class="summary-btn">Generate Report</button>
                 </div>
+
                 <div class="summary-content">
                   <p class="summary-message">Summary will appear here</p>
                 </div>
@@ -90,38 +100,52 @@
           </div>
         </div>
 
-        <!-- Weekly Summary (scroll down) -->
         <div class="weekly-summary-section">
           <h3>Weekly Overview</h3>
           <canvas id="weeklyChart" width="800" height="250"></canvas>
         </div>
 
-        <!-- Monthly Summary (scroll down) -->
         <div class="monthly-summary-section">
           <h3>Monthly Overview</h3>
           <canvas id="monthlyChart" width="800" height="250"></canvas>
         </div>
       </div>
 
-      <!-- Weekly View (separate page) -->
+      <!-- HISTORY VIEW -->
+      <div id="historyView" class="view">
+        <div class="top-bar">
+          <div>
+            <h2>History</h2>
+            <p>Saved activity logs from the database.</p>
+          </div>
+        </div>
+
+        <div class="log-container">
+          <h3>History Logs</h3>
+          <div id="historyLog"></div>
+        </div>
+
+      <!-- WEEKLY VIEW -->
       <div id="weeklyView" class="view">
         <h3>Weekly Details</h3>
         <canvas id="weeklyChartFull" width="800" height="400"></canvas>
       </div>
 
-      <!-- Monthly View (separate page) -->
+      <!-- MONTHLY VIEW -->
       <div id="monthlyView" class="view">
         <h3>Monthly Details</h3>
         <canvas id="monthlyChartFull" width="800" height="400"></canvas>
       </div>
+
     </div>
   </div>
 
-  <!-- Color Palette Modal -->
+  <!-- COLOR MODAL -->
   <div id="colorModal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
       <h3>Customize</h3>
+
       <div class="color-controls">
         <div class="color-item">
           <label>Font Size:</label>
@@ -131,27 +155,82 @@
             <button id="fontPlusModal">A+</button>
           </div>
         </div>
+
         <div class="color-item">
           <label>Productive:</label>
           <input type="color" id="productiveColor" value="#4caf50">
         </div>
+
         <div class="color-item">
           <label>Unproductive:</label>
           <input type="color" id="unproductiveColor" value="#f44336">
         </div>
+
         <div class="color-item">
           <label>Rest:</label>
           <input type="color" id="restColor" value="#ff9800">
         </div>
+
         <div class="color-item">
           <label>Background:</label>
           <input type="color" id="bgColor" value="#ffffff">
         </div>
+
         <div class="color-item">
           <label>Text:</label>
           <input type="color" id="textColor" value="#000000">
         </div>
       </div>
+
+      <div class="settings-two-column">
+        <div class="settings-card">
+          <div class="settings-section-title">Manual Classification Override (Session)</div>
+
+          <div class="manual-override-bar settings-override-panel">
+            <div class="override-current">
+              Override Target: <span id="overrideCurrentApp">No target selected</span>
+            </div>
+
+            <div class="override-target-row">
+              <select id="overrideTargetApp" class="override-select"></select>
+              <button id="useLastActiveAppBtn" class="override-btn clear">Use Last Active App</button>
+            </div>
+
+            <div class="override-actions">
+              <button id="markProductiveBtn" class="override-btn productive">Productive</button>
+              <button id="markUnproductiveBtn" class="override-btn unproductive">Unproductive</button>
+              <button id="markRestBtn" class="override-btn rest">Rest</button>
+              <button id="markUnknownBtn" class="override-btn unknown">Unknown</button>
+              <button id="clearCurrentOverrideBtn" class="override-btn clear">Clear Override</button>
+            </div>
+
+            <div id="overrideStatus" class="override-status">No manual override for this app.</div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-section-title">App Classification Rules</div>
+
+          <div class="app-rules-panel">
+            <div class="app-rules-add-row">
+              <input id="appKeywordInput" class="app-rules-input" type="text" placeholder="e.g. linkedin, udemy, discord">
+              <button id="addProductiveKeywordBtn" class="app-rule-add-btn productive">Add Productive</button>
+              <button id="addUnproductiveKeywordBtn" class="app-rule-add-btn unproductive">Add Unproductive</button>
+            </div>
+
+            <div class="app-rules-header">
+              <span class="app-col-name">App Keyword</span>
+              <span class="app-col-check">Productive</span>
+              <span class="app-col-check">Unproductive</span>
+              <span class="app-col-action">Remove</span>
+            </div>
+
+            <div id="appRulesList" class="app-rules-list"></div>
+            <div id="appRulesEmpty" class="app-rules-empty">No custom rules yet. Add one above.</div>
+          </div>
+        </div>
+      </div>
+
       <button id="applyColors" class="apply-btn">Apply</button>
     </div>
   </div>
