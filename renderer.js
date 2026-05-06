@@ -11,10 +11,7 @@ const breakTimerDisplay = document.getElementById("breakTimerDisplay");
 const endBreakBtn = document.getElementById("endBreakBtn");
 const breakMinutesInput = document.getElementById("breakMinutesInput");
 const logDiv = document.getElementById("log");
-const resetBtn = document.getElementById("resetLog");
-const toggleBtn = document.getElementById("toggleTrackingBtn");
-
-
+const toggleTrackingBtn = document.getElementById("toggleTrackingBtn");
 
 let activityChart = null;
 let weeklyChart = null;
@@ -30,9 +27,11 @@ let breakActive = false;
 let breakInterval = null;
 let breakEndTime = null;
 
+let currentSessionId = localStorage.getItem("currentSessionId");
+let isTracking = false;
+
 let currentFontSize = 100;
 const fontSizeDisplay = document.getElementById("fontSizeModal");
-
 
 let customColors = {
   productive: "#4caf50",
@@ -59,6 +58,7 @@ let currentWindowName = "";
 // Date display
 function updateDateDisplay() {
   const now = new Date();
+
   const dateStr = now.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -83,21 +83,12 @@ setInterval(updateDateDisplay, 1000);
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebarToggle");
 
-
-resetBtn.addEventListener("click", () => {
-  resetLogs();
-});
-
-function resetLogs() {
-  const header = document.querySelector(".log-header");
-
-  logEl.innerHTML = ""; // clears everything
-
-  if (header) {
-    logEl.appendChild(header); // restore header
-  }
+if (resetBtn && logDiv) {
+  resetBtn.addEventListener("click", () => {
+    logDiv.innerHTML = "";
+    addLogHeader();
+  });
 }
-
 
 if (sidebarToggle && sidebar) {
   sidebarToggle.addEventListener("click", () => {
@@ -123,18 +114,18 @@ navBtns.forEach(btn => {
 
     if (view === "weekly") updateWeeklyFullView();
     if (view === "monthly") updateMonthlyFullView();
-    if (view === "history") loadDatabaseLogs();
+    if (view === "history") loadSessions();
   });
 });
 
 // Break modal
-if (takeBreakBtn) {
+if (takeBreakBtn && breakModal) {
   takeBreakBtn.addEventListener("click", () => {
     breakModal.style.display = "block";
   });
 }
 
-if (cancelBreakBtn) {
+if (cancelBreakBtn && breakModal) {
   cancelBreakBtn.addEventListener("click", () => {
     breakModal.style.display = "none";
   });
@@ -152,8 +143,8 @@ if (confirmBreakBtn) {
     breakActive = true;
     breakEndTime = Date.now() + minutes * 60 * 1000;
 
-    breakModal.style.display = "none";
-    activeBreakBar.style.display = "flex";
+    if (breakModal) breakModal.style.display = "none";
+    if (activeBreakBar) activeBreakBar.style.display = "flex";
 
     if (breakInterval) clearInterval(breakInterval);
     breakInterval = setInterval(updateBreakTimer, 1000);
@@ -271,8 +262,11 @@ if (applyColorsBtn) {
     customColors.background = document.getElementById("bgColor").value;
     customColors.text = document.getElementById("textColor").value;
 
-    document.querySelector(".main-content").style.background = customColors.background;
-    document.querySelector(".main-content").style.color = customColors.text;
+    const mainContent = document.querySelector(".main-content");
+    if (mainContent) {
+      mainContent.style.background = customColors.background;
+      mainContent.style.color = customColors.text;
+    }
 
     updateChart();
     updateWeeklyCharts();
@@ -371,112 +365,222 @@ function categorizeApp(appName) {
   return "unknown";
 }
 
+// Session functions
+async function startSession() {
+  try {
+    const res = await fetch("http://127.0.0.1:5000/sessions/start", {
+      method: "POST"
+    });
+
+    const data = await res.json();
+    currentSessionId = data.session_id;
+
+    localStorage.setItem("currentSessionId", currentSessionId);
+
+    console.log("Started session:", currentSessionId);
+    loadSessions();
+  } catch (err) {
+    console.error("Failed to start session:", err);
+  }
+}
+
+async function stopSession() {
+  try {
+    if (!currentSessionId) return;
+
+    await fetch(`http://127.0.0.1:5000/sessions/${currentSessionId}/stop`, {
+      method: "POST"
+    });
+
+    console.log("Stopped session:", currentSessionId);
+
+    currentSessionId = null;
+    localStorage.removeItem("currentSessionId");
+
+    loadSessions();
+  } catch (err) {
+    console.error("Failed to stop session:", err);
+  }
+}
+
 // Database save
 async function saveLogToDatabase(windowTitle) {
+  if (!currentSessionId) {
+    console.log("No session active, log skipped");
+    return;
+  }
+
   try {
     const extracted = extractAppAndTitle(windowTitle);
 
-    await fetch("http://127.0.0.1:5000/logs", {
+    const res = await fetch("http://127.0.0.1:5000/logs", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        app_name: extracted.appName || "Unknown App",
-        window_title: windowTitle || "Unknown Window"
+        session_id: Number(currentSessionId),
+        app_name: extracted.appName,
+        window_title: windowTitle
       })
     });
+
+    const data = await res.json();
+    console.log("Save log response:", data);
+
   } catch (err) {
     console.error("Failed to save log:", err);
   }
 }
 
-// Database load for History page
-async function loadDatabaseLogs() {
+// History page
+async function loadSessions() {
   const historyLog = document.getElementById("historyLog");
-
   if (!historyLog) return;
 
   try {
-    const res = await fetch("http://127.0.0.1:5000/logs");
+    const res = await fetch("http://127.0.0.1:5000/sessions");
+    const sessions = await res.json();
+
+    historyLog.innerHTML = "";
+
+    if (!sessions.length) {
+      historyLog.innerHTML = "<p>No sessions yet.</p>";
+      return;
+    }
+
+    sessions.forEach(session => {
+      const div = document.createElement("div");
+      div.className = "session-card";
+
+      const started = session.started_at
+        ? new Date(session.started_at).toLocaleString()
+        : "Unknown";
+
+      const ended = session.ended_at
+        ? new Date(session.ended_at).toLocaleString()
+        : "Active";
+
+      div.innerHTML = `
+        <strong>Session ${session.id}</strong><br>
+        <small>Started: ${started}</small><br>
+        <small>Ended: ${ended}</small>
+      `;
+
+      div.addEventListener("click", () => loadSessionLogs(session.id));
+
+      historyLog.appendChild(div);
+    });
+  } catch (err) {
+    historyLog.innerHTML = "<p>Database not connected.</p>";
+    console.error("Failed to load sessions:", err);
+  }
+}
+
+async function loadSessionLogs(sessionId) {
+  const historyLog = document.getElementById("historyLog");
+  if (!historyLog) return;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:5000/sessions/${sessionId}/logs`);
     const logs = await res.json();
 
     historyLog.innerHTML = "";
+
+    const backBtn = document.createElement("button");
+    backBtn.textContent = "← Back to Sessions";
+    backBtn.className = "back-btn";
+    backBtn.addEventListener("click", () => {
+      loadSessions();
+    });
+
+    historyLog.appendChild(backBtn);
+
+    const title = document.createElement("h3");
+    title.textContent = `Session ${sessionId}`;
+    historyLog.appendChild(title);
+
+    if (!logs.length) {
+      const empty = document.createElement("p");
+      empty.textContent = "No logs for this session.";
+      historyLog.appendChild(empty);
+      return;
+    }
 
     logs.forEach(log => {
       const div = document.createElement("div");
       div.className = "log-entry";
 
       div.innerHTML = `
-        <strong>${log.app_name}</strong>
-        <span>${log.window_title}</span>
-        <small>${log.timestamp}</small>
+        <strong>${log.app_name}</strong><br>
+        <span>${log.window_title}</span><br>
+        <small>${new Date(log.timestamp).toLocaleString()}</small>
       `;
 
       historyLog.appendChild(div);
     });
+
   } catch (err) {
-    historyLog.innerHTML = "<p>Database not connected.</p>";
-    console.error("Failed to load database logs:", err);
+    historyLog.innerHTML = "<p>Failed to load session logs.</p>";
+    console.error("Failed to load logs:", err);
   }
 }
 
-loadDatabaseLogs();
-setInterval(loadDatabaseLogs, 3000);
-
 // Main Electron update
-window.api.onUpdate((data) => {
-  const now = new Date();
-  currentWindowName = data.current || "No active window";
+if (window.api && window.api.onUpdate) {
+  window.api.onUpdate((data) => {
+    const now = new Date();
+    currentWindowName = data.current || "No active window";
 
-  saveLogToDatabase(currentWindowName);
+    saveLogToDatabase(currentWindowName);
 
-  if (lastEntry && lastTimestamp && lastEntry !== currentWindowName) {
-    const timeDiff = (now - lastTimestamp) / 1000 / 60;
-    const category = categorizeApp(lastEntry);
+    if (lastEntry && lastTimestamp && lastEntry !== currentWindowName) {
+      const timeDiff = (now - lastTimestamp) / 1000 / 60;
+      const category = categorizeApp(lastEntry);
 
-    timeSpent[category] += timeDiff;
+      timeSpent[category] += timeDiff;
 
-    const dateKey = now.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric"
-    });
+      const dateKey = now.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric"
+      });
 
-    if (!weeklyData[dateKey]) {
-      weeklyData[dateKey] = {
-        productive: 0,
-        unproductive: 0,
-        rest: 0,
-        unknown: 0
-      };
+      if (!weeklyData[dateKey]) {
+        weeklyData[dateKey] = {
+          productive: 0,
+          unproductive: 0,
+          rest: 0,
+          unknown: 0
+        };
+      }
+
+      weeklyData[dateKey][category] += timeDiff;
+
+      const monthKey = `Week ${Math.ceil(now.getDate() / 7)}`;
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          productive: 0,
+          unproductive: 0,
+          rest: 0,
+          unknown: 0
+        };
+      }
+
+      monthlyData[monthKey][category] += timeDiff;
     }
 
-    weeklyData[dateKey][category] += timeDiff;
+    updateChart();
+    updateLegend();
+    addToLog(currentWindowName, now);
+    updateWeeklyCharts();
+    updateMonthlyCharts();
 
-    const monthKey = `Week ${Math.ceil(now.getDate() / 7)}`;
-
-    if (!monthlyData[monthKey]) {
-      monthlyData[monthKey] = {
-        productive: 0,
-        unproductive: 0,
-        rest: 0,
-        unknown: 0
-      };
-    }
-
-    monthlyData[monthKey][category] += timeDiff;
-  }
-
-  updateChart();
-  updateLegend();
-  addToLog(currentWindowName, now);
-  updateWeeklyCharts();
-  updateMonthlyCharts();
-
-  lastEntry = currentWindowName;
-  lastTimestamp = now;
-});
+    lastEntry = currentWindowName;
+    lastTimestamp = now;
+  });
+}
 
 // Add live log to Home page
 function addToLog(windowName, timestamp) {
@@ -932,27 +1036,39 @@ if (generateSummaryBtn) {
   });
 }
 
-//start stop 
-const toggleTrackingBtn = document.getElementById("toggleTrackingBtn");
+// Existing Start / Stop button connected to sessions
+if (toggleTrackingBtn) {
+  toggleTrackingBtn.addEventListener("click", async () => {
+    if (!isTracking) {
+      await startSession();
 
-let isTracking = false;
+      if (window.api && window.api.startTracking) {
+        window.api.startTracking();
+      }
+    } else {
+      await stopSession();
 
-toggleTrackingBtn.addEventListener("click", () => {
-  if (!isTracking) {
-    window.api.startTracking();
-  } else {
-    window.api.stopTracking();
-  }
-});
+      if (window.api && window.api.stopTracking) {
+        window.api.stopTracking();
+      }
+    }
+  });
+}
 
-window.api.onTrackingStatus((status) => {
-  isTracking = status.isTracking;
+if (window.api && window.api.onTrackingStatus) {
+  window.api.onTrackingStatus((status) => {
+    isTracking = status.isTracking;
 
-  toggleTrackingBtn.textContent = isTracking
-    ? "Stop Session"
-    : "Start Session";
+    if (toggleTrackingBtn) {
+      toggleTrackingBtn.textContent = isTracking
+        ? "Stop Session"
+        : "Start Session";
 
-  toggleTrackingBtn.classList.toggle("active", isTracking);
-});
+      toggleTrackingBtn.classList.toggle("active", isTracking);
+    }
+  });
+}
+
+loadSessions();
 
 console.log("Dashboard Loaded ✨");

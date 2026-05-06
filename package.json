@@ -5,14 +5,14 @@
   "scripts": {
     "backend": "cd backend && ./venv/bin/python app.py",
     "electron": "electron .",
-    "start": "concurrently \"npm run backend\" \"wait-on http://127.0.0.1:5000/logs && npm run electron\""
-  },
-  "devDependencies": {
-    "concurrently": "^9.2.1",
-    "electron": "^41.5.0"
+    "start": "concurrently \"npm run backend\" \"wait-on http://127.0.0.1:5000 && npm run electron\""
   },
   "dependencies": {
-    "active-win": "^7.7.2",
+    "active-win": "^8.2.1",
+    "concurrently": "^9.2.1",
     "wait-on": "^9.0.5"
+  },
+  "devDependencies": {
+    "electron": "^41.5.0"
   }
 }

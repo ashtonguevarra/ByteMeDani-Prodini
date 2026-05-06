@@ -864,3 +864,27 @@ canvas#monthlyChart {
 .session-btn.active {
   background: #dc2626;
 }
+
+.back-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 16px;
+
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.back-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.back-btn:active {
+  transform: scale(0.97);
+}
