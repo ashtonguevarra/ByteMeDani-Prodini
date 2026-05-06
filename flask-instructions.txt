@@ -1,0 +1,10 @@
+hii guys to setup flask on windows type these commands:
+i also added a script to shorten the process for u guys <3
+
+
+cd Prodini
+npm run start:win
+
+if it doesn't work try to install the dependencies manually:
+npm install
+pip install flask flask-cors flask-sqlalchemy 
