@@ -42,6 +42,9 @@ async function getNativeWindow() {
 
   try {
     const win = await activeWin();
+
+    console.log(win);
+
     if (!win) return null;
 
     return `${win.owner.name} - ${win.title}`;

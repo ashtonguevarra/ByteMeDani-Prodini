@@ -53,13 +53,15 @@ async function startTracking() {
 
   trackingInterval = setInterval(async () => {
     try {
-      const active = await getActiveWindow();
+    const active = await getActiveWindow();
 
-      if (!active) return;
+    if (!active) return;
 
-      const currentWindow = active.toLowerCase().trim();
+    const currentWindow = active.trim();
 
-      if (currentWindow !== lastWindow) {
+    console.log("Detected window:", currentWindow);
+
+    if (currentWindow !== lastWindow) {
         const entry = {
           timestamp: new Date().toISOString(),
           window: currentWindow
