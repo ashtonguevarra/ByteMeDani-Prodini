@@ -1,5 +1,6 @@
 {
-  "name": "logger-app",
+  "name": "prodini",
+  "productName": "Prodini",
   "version": "1.0.0",
   "description": "",
   "main": "main.js",
@@ -14,7 +15,6 @@
     "electron": "^41.5.0"
   },
   "dependencies": {
-    "active-win": "^8.2.1",
-    "node-notifier": "^10.0.1"
+    "active-win": "^8.2.1"
   }
 }

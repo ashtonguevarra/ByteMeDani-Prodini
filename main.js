@@ -1,8 +1,11 @@
-const { app, BrowserWindow, ipcMain, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, Notification } = require("electron");
 const path = require("path");
 const { getActiveWindow } = require("./tracker");
 const fs = require("fs");
-const notifier = require("node-notifier");
+
+const sleepToastIcon = path.join(__dirname, "assets", "zzz-toast.svg");
+
+app.setName("Prodini");
 
 let win;
 let lastWindow = "";
@@ -82,38 +85,51 @@ app.whenReady().then(() => {
   createWindow();
 });
 
+app.on("activate", () => {
+  if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  } else {
+    createWindow();
+  }
+});
+
+ipcMain.handle("focus-window", () => {
+  try {
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      return true;
+    }
+  } catch (error) {
+    console.error("[Main] Failed to focus window:", error);
+  }
+  return false;
+});
+
 ipcMain.handle("show-unproductive-notification", (_, { title, body }) => {
   try {
-    console.log("[Notification] Creating notification with node-notifier");
-    
-    const notification = notifier.notify({
+    const notification = new Notification({
       title: title,
-      message: body,
-      sound: false,
-      wait: true,
-      appID: "com.bytemedani.tracker"
-    }, (err, response, metadata) => {
-      if (err) {
-        console.error("[Notification] Error:", err);
-        return;
-      }
-      console.log("[Notification] Response from notifier:", response);
-      
-      if (response === "activate" || response === "clicked") {
-        console.log("[Notification] User clicked notification");
-        if (win && !win.isDestroyed()) {
-          console.log("[Notification] Focusing window and sending IPC");
-          if (win.isMinimized()) win.restore();
-          win.show();
-          win.focus();
-          setTimeout(() => {
-            if (win && !win.isDestroyed()) {
-              win.webContents.send("unproductive-notification-clicked");
-            }
-          }, 100);
+      body,
+      silent: true,
+      icon: sleepToastIcon
+    });
+
+    notification.on("click", () => {
+      if (win && !win.isDestroyed()) {
+        if (win.isMinimized()) win.restore();
+        win.show();
+        win.focus();
+        if (win.webContents) {
+          win.webContents.send("show-live-tracking");
         }
       }
     });
+
+    notification.show();
     
     return true;
   } catch (error) {

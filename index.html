@@ -207,14 +207,29 @@
                 <option value="intense">Intense</option>
               </select>
             </div>
-            <div class="notification-row notification-test-row">
-              <button id="notifyTestBtn" class="report-history-clear" type="button">Test Notification</button>
-            </div>
             <div id="notifySummary" class="notification-summary">Saved for future sessions.</div>
           </div>
 
           <div class="settings-section-title">Distraction Report History</div>
           <div class="app-rules-panel report-history-panel">
+            <div id="reportSummaryCard" class="report-summary-card">
+              <div class="report-summary-item">
+                <div class="report-summary-label">Total time distracted</div>
+                <div id="reportSummaryTotal" class="report-summary-value">0 min</div>
+              </div>
+              <div class="report-summary-item">
+                <div class="report-summary-label">Most recent app</div>
+                <div id="reportSummaryApp" class="report-summary-value">None</div>
+              </div>
+              <div class="report-summary-item">
+                <div class="report-summary-label">Most distracted app</div>
+                <div id="reportSummaryTopApp" class="report-summary-value">None</div>
+              </div>
+              <div class="report-summary-item">
+                <div class="report-summary-label">Latest at</div>
+                <div id="reportSummaryTime" class="report-summary-value">--</div>
+              </div>
+            </div>
             <div id="reportHistoryEmpty" class="app-rules-empty">No distraction reports yet.</div>
             <div id="reportHistoryList" class="report-history-list"></div>
             <button id="clearReportHistoryBtn" class="report-history-clear" type="button">Clear History</button>
@@ -254,23 +269,5 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="renderer.js"></script>
-  <!-- Distraction report modal -->
-  <div id="distractedModal" class="distracted-modal" style="display:none;">
-    <div class="distracted-modal-content">
-      <h3>Quick check — what distracted you?</h3>
-      <div class="distracted-options">
-        <label><input type="radio" name="distractReason" value="notifications"> Notifications</label>
-        <label><input type="radio" name="distractReason" value="phone"> Phone / Messages</label>
-        <label><input type="radio" name="distractReason" value="social"> Social Media</label>
-        <label><input type="radio" name="distractReason" value="fatigue"> Fatigue</label>
-        <label><input type="radio" name="distractReason" value="other"> Other</label>
-      </div>
-      <textarea id="distractNote" placeholder="Optional note (what happened?)"></textarea>
-      <div class="distracted-actions">
-        <button id="distractSubmitBtn" class="confirm-break-btn">Submit</button>
-        <button id="distractDismissBtn" class="cancel-break-btn">Dismiss</button>
-      </div>
-    </div>
-  </div>
 </body>
 </html>

@@ -34,15 +34,14 @@ const notifyToggle = document.getElementById("notifyToggle");
 const notifyThresholdInput = document.getElementById("notifyThresholdInput");
 const notifyUnitSelect = document.getElementById("notifyUnitSelect");
 const notifySoundProfile = document.getElementById("notifySoundProfile");
-const notifyTestBtn = document.getElementById("notifyTestBtn");
 const notifySummary = document.getElementById("notifySummary");
+const reportSummaryTotal = document.getElementById("reportSummaryTotal");
+const reportSummaryApp = document.getElementById("reportSummaryApp");
+const reportSummaryTopApp = document.getElementById("reportSummaryTopApp");
+const reportSummaryTime = document.getElementById("reportSummaryTime");
 const reportHistoryList = document.getElementById("reportHistoryList");
 const reportHistoryEmpty = document.getElementById("reportHistoryEmpty");
 const clearReportHistoryBtn = document.getElementById("clearReportHistoryBtn");
-const distractedModal = document.getElementById("distractedModal");
-const distractSubmitBtn = document.getElementById("distractSubmitBtn");
-const distractDismissBtn = document.getElementById("distractDismissBtn");
-const distractNote = document.getElementById("distractNote");
 
 let activityChart = null;
 let weeklyChart = null;
@@ -398,6 +397,50 @@ function saveDistractionReport(report) {
   } catch (e) {}
 }
 
+function recordDistractionReport(app, durationMinutes, source) {
+  const normalizedDuration = Math.max(1, Math.round(Number(durationMinutes) || 0));
+  saveDistractionReport({
+    ts: Date.now(),
+    app: app || 'Unknown app',
+    durationMinutes: normalizedDuration,
+    source: source || 'alert'
+  });
+}
+
+function updateDistractionSummary() {
+  if (reportSummaryTotal) {
+    const totalMinutes = distractionReports.reduce((sum, report) => sum + (Number(report.durationMinutes) || 0), 0);
+    reportSummaryTotal.textContent = `${totalMinutes} min`;
+  }
+
+  if (reportSummaryApp) {
+    const latestReport = [...distractionReports].sort((left, right) => right.ts - left.ts)[0];
+    reportSummaryApp.textContent = latestReport?.app || 'None';
+  }
+
+  if (reportSummaryTopApp) {
+    const byApp = new Map();
+    for (const report of distractionReports) {
+      const appName = report.app || 'Unknown app';
+      byApp.set(appName, (byApp.get(appName) || 0) + (Number(report.durationMinutes) || 0));
+    }
+    let topApp = 'None';
+    let topMinutes = 0;
+    for (const [appName, minutes] of byApp.entries()) {
+      if (minutes > topMinutes) {
+        topMinutes = minutes;
+        topApp = appName;
+      }
+    }
+    reportSummaryTopApp.textContent = topApp;
+  }
+
+  if (reportSummaryTime) {
+    const latestReport = [...distractionReports].sort((left, right) => right.ts - left.ts)[0];
+    reportSummaryTime.textContent = latestReport ? formatReportTime(latestReport.ts) : '--';
+  }
+}
+
 function formatReportTime(ts) {
   return new Date(ts).toLocaleString([], {
     month: 'short',
@@ -405,18 +448,6 @@ function formatReportTime(ts) {
     hour: '2-digit',
     minute: '2-digit'
   });
-}
-
-function getReasonLabel(reason) {
-  const labels = {
-    notifications: 'Notifications',
-    phone: 'Phone / Messages',
-    social: 'Social Media',
-    fatigue: 'Fatigue',
-    other: 'Other',
-    unknown: 'Unspecified'
-  };
-  return labels[reason] || labels.unknown;
 }
 
 function updateNotificationSummary() {
@@ -434,6 +465,7 @@ function renderDistractionReports() {
   const reports = [...distractionReports].sort((left, right) => right.ts - left.ts);
   reportHistoryList.innerHTML = '';
   reportHistoryEmpty.style.display = reports.length ? 'none' : 'block';
+  updateDistractionSummary();
 
   for (const report of reports.slice(0, 10)) {
     const item = document.createElement('div');
@@ -443,8 +475,7 @@ function renderDistractionReports() {
         <span class="report-history-app">${report.app || 'Unknown app'}</span>
         <span class="report-history-time">${formatReportTime(report.ts)}</span>
       </div>
-      <div class="report-history-meta">${getReasonLabel(report.reason)} • ${report.durationMinutes || 0} min</div>
-      ${report.note ? `<div class="report-history-note">${report.note}</div>` : ''}
+      <div class="report-history-meta">Duration: ${report.durationMinutes || 0} min${report.source ? ` • ${report.source}` : ''}</div>
     `;
     reportHistoryList.appendChild(item);
   }
@@ -561,88 +592,54 @@ function playProductivityAlertSound(profile = notificationSettings.soundProfile 
   }
 }
 
-function openDistractionModal(app) {
-  lastUnproductiveApp = app;
-  if (!distractedModal) return;
-
-  const checked = document.querySelector('input[name="distractReason"]:checked');
-  if (checked) checked.checked = false;
-  if (distractNote) distractNote.value = '';
-  distractedModal.style.display = 'block';
-}
-
-if (window.api?.onNotificationClicked) {
-  console.log("[Renderer] Setting up notification click listener");
-  window.api.onNotificationClicked(() => {
-    console.log("[Renderer] Notification clicked! Opening distraction modal");
-    openDistractionModal(lastUnproductiveApp || currentWindowName || 'Distracting app');
-  });
-}
-
-if (notifyTestBtn) {
-  notifyTestBtn.addEventListener('click', () => {
-    const title = 'Time to Refocus (Test)';
-    const selectedProfile = notificationSettings.soundProfile || 'normal';
-    const body = 'You\'ve been on a distracting app for 1 minute. Click this to log why you got distracted.';
-    const testApp = 'Test Session - Productivity Alert';
-    playProductivityAlertSound(selectedProfile);
-    if (window.api?.showUnproductiveNotification) {
-      window.api.showUnproductiveNotification({ title, body }).catch(() => {});
-    }
-
-    // Exercise distraction report flow without waiting for timer threshold.
-    unproductiveSessionStart = Date.now() - 60000;
-    openDistractionModal(testApp);
+if (window.api?.onShowLiveTracking) {
+  window.api.onShowLiveTracking(() => {
+    navBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.view === 'home');
+    });
+    homeView.classList.add('active');
+    weeklyView.classList.remove('active');
+    monthlyView.classList.remove('active');
   });
 }
 
 if (clearReportHistoryBtn) {
   clearReportHistoryBtn.addEventListener('click', () => {
+    const shouldClear = window.confirm('Are you sure you want to clear all distraction history?');
+    if (!shouldClear) return;
+
     distractionReports = [];
     localStorage.setItem(DISTRACTION_REPORTS_KEY, JSON.stringify(distractionReports));
     renderDistractionReports();
   });
 }
 
-// Distracted modal handlers
-if (distractDismissBtn) {
-  distractDismissBtn.addEventListener('click', () => {
-    if (distractedModal) distractedModal.style.display = 'none';
-  });
-}
-if (distractSubmitBtn) {
-  distractSubmitBtn.addEventListener('click', () => {
-    const reasonEl = document.querySelector('input[name="distractReason"]:checked');
-    const reason = reasonEl ? reasonEl.value : 'unknown';
-    const note = (distractNote?.value || '').trim();
-    const duration = unproductiveSessionStart ? Math.round((Date.now() - unproductiveSessionStart) / 60000) : 0;
-    const report = { ts: Date.now(), app: lastUnproductiveApp || '', durationMinutes: duration, reason, note };
-    saveDistractionReport(report);
-    if (distractedModal) distractedModal.style.display = 'none';
-  });
-}
-
 function triggerUnproductiveNotification(app, durationMinutes) {
   try {
     const title = 'Time to Refocus';
-    const body = `You've been on ${app} for ${durationMinutes} minute(s). Click to log why you got distracted.`;
+    const body = `You've been on ${app} for ${durationMinutes} minute(s).`;
+    
+    // Play alert sound
     playProductivityAlertSound(notificationSettings.soundProfile || 'normal');
+    
+    // Store the app for when notification is clicked
+    lastUnproductiveApp = app;
+    unproductiveSessionStart = Date.now() - (durationMinutes * 60000);
+
+    recordDistractionReport(app, durationMinutes, 'alert');
+    
+    // Show system notification
     if (window.api?.showUnproductiveNotification) {
-      window.api.showUnproductiveNotification({ title, body }).catch(err => {
+      window.api.showUnproductiveNotification({
+        title: `😴 ${title}`,
+        body: `Zzz... ${body}`
+      }).catch(err => {
         console.error('[Notification] IPC notification error:', err);
       });
-    } else if (window.Notification) {
-      if (Notification.permission === 'granted') {
-        new Notification(title, { body });
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(p => { if (p === 'granted') new Notification(title, { body }); });
-      }
     }
   } catch (e) {
     console.error('[Notification] Exception:', e);
   }
-
-  openDistractionModal(app);
 }
 
 function setAppRulesNotice(message) {
