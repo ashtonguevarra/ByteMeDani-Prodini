@@ -44,7 +44,7 @@ The app continuously records:
 
 ```bash
 git clone https://github.com/ashtonguevarra/Byte-Me-Dani.git
-cd Byte-Me-Dani
+cd ByteMeDani-Prodini
 ```
 
 ---
