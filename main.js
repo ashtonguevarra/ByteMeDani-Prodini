@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
+const { spawn } = require("child_process");
 const { getActiveWindow } = require("./tracker");
 const fs = require("fs");
 
@@ -9,6 +10,40 @@ let history = [];
 
 let trackingInterval = null;
 let isTracking = false;
+
+let pythonProcess = null;
+
+/* -----------------------------
+   START FLASK BACKEND
+----------------------------- */
+
+function startBackend() {
+  const isWindows = process.platform === "win32";
+
+  const pythonPath = isWindows
+    ? path.join(__dirname, "backend", "venv", "Scripts", "python.exe")
+    : path.join(__dirname, "backend", "venv", "bin", "python");
+
+  const backendPath = path.join(__dirname, "backend", "app.py");
+
+  pythonProcess = spawn(pythonPath, [backendPath]);
+
+  pythonProcess.stdout.on("data", (data) => {
+    console.log(`[FLASK]: ${data}`);
+  });
+
+  pythonProcess.stderr.on("data", (data) => {
+    console.error(`[FLASK ERROR]: ${data}`);
+  });
+
+  pythonProcess.on("close", (code) => {
+    console.log(`Flask process exited with code ${code}`);
+  });
+}
+
+/* -----------------------------
+   CREATE WINDOW
+----------------------------- */
 
 function createWindow() {
   win = new BrowserWindow({
@@ -36,9 +71,17 @@ function createWindow() {
   });
 }
 
+/* -----------------------------
+   LOGGING
+----------------------------- */
+
 function logToFile(entry) {
   fs.appendFileSync("activity.log", JSON.stringify(entry) + "\n");
 }
+
+/* -----------------------------
+   TRACKING
+----------------------------- */
 
 async function startTracking() {
   if (isTracking) return;
@@ -53,15 +96,15 @@ async function startTracking() {
 
   trackingInterval = setInterval(async () => {
     try {
-    const active = await getActiveWindow();
+      const active = await getActiveWindow();
 
-    if (!active) return;
+      if (!active) return;
 
-    const currentWindow = active.trim();
+      const currentWindow = active.trim();
 
-    console.log("Detected window:", currentWindow);
+      console.log("Detected window:", currentWindow);
 
-    if (currentWindow !== lastWindow) {
+      if (currentWindow !== lastWindow) {
         const entry = {
           timestamp: new Date().toISOString(),
           window: currentWindow
@@ -104,6 +147,10 @@ function stopTracking() {
   console.log("Tracking stopped");
 }
 
+/* -----------------------------
+   IPC EVENTS
+----------------------------- */
+
 ipcMain.on("start-tracking", () => {
   startTracking();
 });
@@ -112,11 +159,24 @@ ipcMain.on("stop-tracking", () => {
   stopTracking();
 });
 
+/* -----------------------------
+   APP START
+----------------------------- */
+
 app.whenReady().then(() => {
+  startBackend();
   createWindow();
 });
 
+/* -----------------------------
+   APP CLOSE
+----------------------------- */
+
 app.on("window-all-closed", () => {
+  if (pythonProcess) {
+    pythonProcess.kill();
+  }
+
   if (process.platform !== "darwin") {
     app.quit();
   }
