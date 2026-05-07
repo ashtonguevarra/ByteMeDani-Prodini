@@ -85,6 +85,26 @@ async function getNativeWindow() {
 }
 
 /**
+ * Windows PowerShell fallback to get the foreground window and process name
+ * This avoids native module builds (ffi-napi) by invoking a small PowerShell
+ * snippet that calls user32.dll via Add-Type and returns "ProcessName - Title".
+ * @returns {string|null}
+ */
+function getWindowsViaPowerShell() {
+  // Build a PowerShell one-liner that defines the native methods and prints the result
+  // Use a full C# TypeDefinition (with using directives) so Add-Type compiles
+  const ps = 'powershell -NoProfile -Command "Add-Type -TypeDefinition \'using System; using System.Text; using System.Runtime.InteropServices; public class User32 { [DllImport(\\"user32.dll\\")] public static extern IntPtr GetForegroundWindow(); [DllImport(\\"user32.dll\\")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count); [DllImport(\\"user32.dll\\")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId); }\' ; $hwnd=[User32]::GetForegroundWindow(); $sb=New-Object System.Text.StringBuilder 1024; [User32]::GetWindowText($hwnd,$sb,$sb.Capacity) | Out-Null; $outPid=0; [User32]::GetWindowThreadProcessId($hwnd,[ref]$outPid) | Out-Null; $pid=[int]$outPid; $p=Get-Process -Id $pid; Write-Output ($p.ProcessName + ' - ' + $sb.ToString())"';
+
+  try {
+    const out = run(ps);
+    return out || null;
+  } catch (err) {
+    console.warn('PowerShell fallback failed:', err && err.message);
+    return null;
+  }
+}
+
+/**
  * Main function to get the active window across all supported platforms
  * Automatically detects the platform and uses the appropriate method
  * 
@@ -126,6 +146,13 @@ async function getActiveWindow() {
   if (win) return win;
 
   // If all methods fail, return error message
+  // Try PowerShell fallback on Windows before giving up
+  if (platform === "win32") {
+    console.debug("Attempting PowerShell fallback for Windows active window");
+    const psWin = getWindowsViaPowerShell();
+    if (psWin) return psWin;
+  }
+
   console.error("Unable to track active window on this system");
   return "Unable to track window - system not properly supported or active-win module not installed";
 }
