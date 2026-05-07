@@ -663,7 +663,7 @@ canvas#monthlyChart {
 .app-rules-header,
 .app-rule-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) 90px 100px 70px;
+  grid-template-columns: minmax(0, 2.2fr) 84px 88px 68px;
   gap: 8px;
   align-items: center;
 }
@@ -694,6 +694,30 @@ canvas#monthlyChart {
   white-space: normal;
   word-break: break-word;
   line-height: 1.25;
+  font-size: 0.68rem;
+  padding: 3px 6px;
+  border: 1px solid #d5deea;
+  border-radius: 5px;
+  min-width: 0;
+  width: 100%;
+  background: #fff;
+}
+
+.app-rule-name:focus {
+  outline: 2px solid rgba(76, 175, 80, 0.25);
+  border-color: #4caf50;
+}
+
+.app-rule-row .app-rule-name {
+  font-size: 0.68rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.app-rule-row .app-rule-name,
+.app-rule-row .app-rule-check,
+.app-rule-row .app-rule-remove {
+  align-self: center;
 }
 
 .app-rule-check {
@@ -709,6 +733,11 @@ canvas#monthlyChart {
   font-weight: 600;
   padding: 4px 6px;
   cursor: pointer;
+}
+
+.take-break-btn.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .app-rules-empty {

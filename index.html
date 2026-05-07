@@ -48,7 +48,13 @@
         <div id="breakModal" class="break-modal">
           <div class="break-modal-content">
             <h3>Take a Break</h3>
-            <input type="number" id="breakMinutesInput" placeholder="Minutes" min="1" max="180" value="15">
+            <div class="break-input-row">
+              <input type="number" id="breakValueInput" placeholder="0" min="0" max="168" value="0">
+              <select id="breakUnit">
+                <option value="minutes" selected>Minutes</option>
+                <option value="hours">Hours</option>
+              </select>
+            </div>
 
             <div class="break-modal-buttons">
               <button id="confirmBreakBtn" class="confirm-break-btn">Start Break</button>
@@ -124,6 +130,7 @@
           <h3>History Logs</h3>
           <div id="historyLog"></div>
         </div>
+      </div>
 
       <!-- WEEKLY VIEW -->
       <div id="weeklyView" class="view">
