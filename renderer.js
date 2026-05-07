@@ -51,6 +51,7 @@ let breakEndTime = null;
 
 let currentSessionId = localStorage.getItem("currentSessionId");
 let isTracking = false;
+let lastTrackingStatus = null;
 let currentFontSize = 100;
 
 let customColors = {
@@ -69,6 +70,8 @@ let timeSpent = {
   unknown: 0
 };
 
+const CHART_CATEGORIES = ["productive", "unproductive", "rest"];
+
 let weeklyData = {};
 let monthlyData = {};
 let lastEntry = null;
@@ -80,12 +83,14 @@ const DEFAULT_PRODUCTIVE_APPS = [
   "terminal", "notion", "figma", "excel", "word", "code", "brave", "chrome", "firefox",
   "github", "gitlab", "slack", "teams", "zoom", "meet", "gmail", "outlook", "drive",
   "docs", "sheets", "slides", "postman", "insomnia", "jupyter", "android studio",
-  "xcode", "datagrip", "webstorm", "sublime text", "obsidian"
+  "xcode", "datagrip", "webstorm", "sublime text", "obsidian",
+  "canva", "trello", "asana", "microsoft planner", "planner", "discord"
 ];
 
 const DEFAULT_UNPRODUCTIVE_APPS = [
   "youtube", "twitter", "facebook", "instagram", "reddit",
-  "twitch", "tiktok", "netflix", "hulu", "snapchat", "threads", "pinterest", "messenger"
+  "twitch", "tiktok", "netflix", "hulu", "snapchat", "threads", "pinterest", "messenger",
+  "x", "kick", "9gag", "bilibili", "temu", "shopee", "tiktok shop"
 ];
 
 const restApps = ["calendar", "reminders", "clock", "alarm", "settings", "spotify", "music", "apple music"];
@@ -222,6 +227,48 @@ async function startSession() {
   loadSessions();
 }
 
+function clearDashboardActivity() {
+  currentWindowName = "";
+  lastEntry = null;
+  lastTimestamp = null;
+  timeSpent = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
+  weeklyData = {};
+  monthlyData = {};
+
+  if (logEl) {
+    logEl.innerHTML = "";
+    addLogHeader();
+  }
+
+  if (activityChart) {
+    activityChart.destroy();
+    activityChart = null;
+  }
+  if (weeklyChart) {
+    weeklyChart.destroy();
+    weeklyChart = null;
+  }
+  if (monthlyChart) {
+    monthlyChart.destroy();
+    monthlyChart = null;
+  }
+  if (weeklyChartFull) {
+    weeklyChartFull.destroy();
+    weeklyChartFull = null;
+  }
+  if (monthlyChartFull) {
+    monthlyChartFull.destroy();
+    monthlyChartFull = null;
+  }
+
+  updateChart();
+  updateLegend();
+  updateWeeklyCharts();
+  updateMonthlyCharts();
+  updateWeeklyFullView();
+  updateMonthlyFullView();
+}
+
 async function stopSession() {
   if (!currentSessionId) return;
 
@@ -229,6 +276,7 @@ async function stopSession() {
   currentSessionId = null;
   localStorage.removeItem("currentSessionId");
   loadSessions();
+  clearDashboardActivity();
 }
 
 async function saveLogToDatabase(windowTitle) {
@@ -378,13 +426,13 @@ function updateChart() {
   const ctx = canvas.getContext("2d");
   updateChartSize();
 
-  const labels = ["Productive", "Unproductive", "Rest", "Unknown"];
-  const data = [timeSpent.productive, timeSpent.unproductive, timeSpent.rest, timeSpent.unknown];
+  const labels = ["Productive", "Unproductive", "Rest"];
+  const data = CHART_CATEGORIES.map(category => timeSpent[category]);
 
   if (activityChart) {
     activityChart.data.labels = labels;
     activityChart.data.datasets[0].data = data;
-    activityChart.data.datasets[0].backgroundColor = [customColors.productive, customColors.unproductive, customColors.rest, customColors.unknown];
+    activityChart.data.datasets[0].backgroundColor = [customColors.productive, customColors.unproductive, customColors.rest];
     activityChart.update();
     return;
   }
@@ -395,7 +443,7 @@ function updateChart() {
       labels,
       datasets: [{
         data,
-        backgroundColor: [customColors.productive, customColors.unproductive, customColors.rest, customColors.unknown],
+        backgroundColor: [customColors.productive, customColors.unproductive, customColors.rest],
         borderWidth: 1,
         radius: "90%"
       }]
@@ -422,7 +470,6 @@ function updateLegend() {
     <div class="legend-item"><div style="display:flex;align-items:center;"><div class="legend-color" style="background:${customColors.productive}"></div><span class="legend-label">Productive</span></div><span class="legend-time">${formatTime(timeSpent.productive)}</span></div>
     <div class="legend-item"><div style="display:flex;align-items:center;"><div class="legend-color" style="background:${customColors.unproductive}"></div><span class="legend-label">Unproductive</span></div><span class="legend-time">${formatTime(timeSpent.unproductive)}</span></div>
     <div class="legend-item"><div style="display:flex;align-items:center;"><div class="legend-color" style="background:${customColors.rest}"></div><span class="legend-label">Rest</span></div><span class="legend-time">${formatTime(timeSpent.rest)}</span></div>
-    <div class="legend-item"><div style="display:flex;align-items:center;"><div class="legend-color" style="background:${customColors.unknown}"></div><span class="legend-label">Unknown</span></div><span class="legend-time">${formatTime(timeSpent.unknown)}</span></div>
   `;
 }
 
@@ -536,8 +583,12 @@ function switchView(view) {
 
 if (resetBtn && logDiv) {
   resetBtn.addEventListener("click", () => {
+    const ok = confirm("Reset the current dashboard log?");
+    if (!ok) return;
+
     logDiv.innerHTML = "";
     addLogHeader();
+    clearDashboardActivity();
   });
 }
 
@@ -721,11 +772,19 @@ if (window.api && window.api.onUpdate) {
 
 if (window.api && window.api.onTrackingStatus) {
   window.api.onTrackingStatus(status => {
-    isTracking = Boolean(status && status.isTracking);
+    const nextTrackingStatus = Boolean(status && status.isTracking);
+    const wasTracking = lastTrackingStatus;
+    isTracking = nextTrackingStatus;
     if (toggleTrackingBtn) {
       toggleTrackingBtn.textContent = isTracking ? "Stop Session" : "Start Session";
       toggleTrackingBtn.classList.toggle("active", isTracking);
     }
+
+    if (wasTracking === true && !isTracking) {
+      clearDashboardActivity();
+    }
+
+    lastTrackingStatus = isTracking;
   });
 }
 
