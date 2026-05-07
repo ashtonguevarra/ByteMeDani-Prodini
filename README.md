@@ -10,9 +10,13 @@ Prodini is an interstitial journaling app that helps users become more aware of 
 
 * Automatic desktop activity tracking
 * Real-time activity logs display
-* Flask backend with SQL database storage
-* Simple and clean Electron UI
+* Productivity statistics and visual activity insights
+* Simple and clean UI
 * Interstitial-style frequent logging
+* Session-based focus tracking
+* Break timer and productivity balance support
+* Customizable productivity classifications
+* Interactive activity charts and reports
 
 ---
 
@@ -21,7 +25,7 @@ Prodini is an interstitial journaling app that helps users become more aware of 
 * **Frontend:** Electron (HTML, CSS, JavaScript)
 * **Backend:** Flask
 * **Database:** SQLite (via SQLAlchemy)
-* **Other Tools:** active-win
+* **Other Tools:** active-win, xdotool
 
 ---
 
