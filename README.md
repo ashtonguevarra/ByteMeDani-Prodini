@@ -25,18 +25,20 @@ Prodini is an interstitial journaling app that helps users become more aware of 
 
 ---
 
-## Setup Instructions
+# Setup Instructions
 
-### 1. Clone the repository
+## 1. Clone the Repository
 
 ```bash
 git clone https://github.com/ashtonguevarra/Byte-Me-Dani.git
-cd Prodini
+cd Byte-Me-Dani
 ```
 
 ---
 
-### 2. Install frontend dependencies
+## 2. Install Frontend Dependencies
+
+From the root folder:
 
 ```bash
 npm install
@@ -44,34 +46,41 @@ npm install
 
 ---
 
-### 3. Setup Flask backend
+## 3. Setup the Flask Backend
+
+Move into the backend folder:
 
 ```bash
 cd backend
+```
+
+Create a virtual environment:
+
+```bash
 python -m venv venv
 ```
 
-Activate environment:
+### Activate the Virtual Environment
 
-**Linux / macOS**
+#### Linux / macOS
 
 ```bash
 source venv/bin/activate
 ```
 
-**Windows**
+#### Windows
 
 ```bash
 venv\Scripts\activate
 ```
 
-Install dependencies:
+Install backend dependencies:
 
 ```bash
 pip install flask flask_sqlalchemy flask_cors
 ```
 
-Run backend:
+Run the Flask backend:
 
 ```bash
 python app.py
@@ -79,15 +88,13 @@ python app.py
 
 ---
 
-### 4. Run the application
+## 4. Run the Electron Application
 
-From root folder:
+Open another terminal in the project root folder and run:
 
 ```bash
 npm start
 ```
-
----
 
 ## Common Issues
 
@@ -103,10 +110,6 @@ pip install flask flask_sqlalchemy flask_cors
 npm install electron --save-dev
 ```
 
----
 
-## 🎯 Purpose
-
-This project helps users track productivity and analyze their daily digital habits through automatic logging and simple visualization.
 
 
