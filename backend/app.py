@@ -11,6 +11,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import time
 """
 ACTIVITY LOGGER - BACKEND API (Flask)
 
@@ -39,21 +40,16 @@ db = SQLAlchemy(app)
 
 
 class Session(db.Model):
-    """Tracks a single session of activity monitoring."""
-
     id = db.Column(db.Integer, primary_key=True)
-    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime, default=datetime.now)  # Changed from utcnow
     ended_at = db.Column(db.DateTime, nullable=True)
 
-
 class ActivityLog(db.Model):
-    """Records a single window change event during a session."""
-
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.Integer, db.ForeignKey("session.id"), nullable=False)
     app_name = db.Column(db.String(100), nullable=False)
     window_title = db.Column(db.String(255), nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=datetime.now)  # Changed from utcnow
 
 
 @app.route("/sessions/start", methods=["POST"])
@@ -69,12 +65,9 @@ def start_session():
 
 @app.route("/sessions/<int:session_id>/stop", methods=["POST"])
 def stop_session(session_id):
-    """Mark a session as ended by setting its end timestamp."""
-
     session = Session.query.get_or_404(session_id)
-    session.ended_at = datetime.utcnow()
+    session.ended_at = datetime.now()  # Changed from utcnow
     db.session.commit()
-
     return jsonify({"message": "Session stopped"})
 
 

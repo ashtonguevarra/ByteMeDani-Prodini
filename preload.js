@@ -62,3 +62,16 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("native-notification-click", () => callback());
   }
 });
+
+contextBridge.exposeInMainWorld("api", {
+  onUpdate: (callback) => {
+    ipcRenderer.on("activity-update", (_, data) => callback(data));
+  },
+  onTrackingStatus: (callback) => {
+    ipcRenderer.on("tracking-status", (_, status) => callback(status));
+  },
+  startTracking: () => ipcRenderer.send("start-tracking"),
+  stopTracking: () => ipcRenderer.send("stop-tracking"),
+  // ADD THIS:
+  endSessionOnQuit: () => ipcRenderer.send("end-session-on-quit")
+});

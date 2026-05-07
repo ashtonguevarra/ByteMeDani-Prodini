@@ -29,12 +29,15 @@ let isTracking = false; // Flag to indicate if tracking is currently active
 function createWindow() {
   // Create a new browser window with specified dimensions
   win = new BrowserWindow({
-    width: 900,
-    height: 600,
+    width: 1200,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    icon: path.join(__dirname, "assets", "icon.png"), 
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"), // Preload script for secure IPC
-      contextIsolation: true, // Isolate context for security
-      nodeIntegration: false // Disable Node integration in renderer for security
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false
     }
   });
 
@@ -205,6 +208,10 @@ ipcMain.on("show-native-notification", (event, payload = {}) => {
 // ============== APPLICATION LIFECYCLE ==============
 // Initialize the application when Electron is ready
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    const iconPath = path.join(__dirname, "assets", "icon.png");
+    app.setAppUserModelId("com.prodini.activitytracker"); // This helps Windows recognize the icon
+  }
   createWindow();
 });
 
@@ -214,6 +221,11 @@ try {
 } catch (err) {
   console.warn("Failed to remove application menu:", err && err.message);
 }
+
+ipcMain.on("end-session-on-quit", async () => {
+  // This will be called from renderer when app is closing
+  console.log("Received request to end session on quit");
+});
 
 // Quit the application when all windows are closed (except on macOS)
 // On macOS, applications typically remain active until the user explicitly quits
