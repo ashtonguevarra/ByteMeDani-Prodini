@@ -38,6 +38,16 @@ const colorBtn = document.getElementById("colorPaletteBtn");
 const closeBtn = document.querySelector(".close");
 const applyColorsBtn = document.getElementById("applyColors");
 const generateSummaryBtn = document.getElementById("generateSummaryBtn");
+const overrideTargetSelect = document.getElementById("overrideTargetApp");
+const useLastActiveAppBtn = document.getElementById("useLastActiveAppBtn");
+const markProductiveBtn = document.getElementById("markProductiveBtn");
+const markUnproductiveBtn = document.getElementById("markUnproductiveBtn");
+const markRestBtn = document.getElementById("markRestBtn");
+const markUnknownBtn = document.getElementById("markUnknownBtn");
+const clearCurrentOverrideBtn = document.getElementById("clearCurrentOverrideBtn");
+const appKeywordInput = document.getElementById("appKeywordInput");
+const addProductiveKeywordBtn = document.getElementById("addProductiveKeywordBtn");
+const addUnproductiveKeywordBtn = document.getElementById("addUnproductiveKeywordBtn");
 
 let activityChart = null;
 let weeklyChart = null;
@@ -77,6 +87,14 @@ let monthlyData = {};
 let lastEntry = null;
 let lastTimestamp = null;
 let currentWindowName = "";
+let lastActiveAppName = "";
+let lastActiveWindowTitle = "";
+let overrideTargetApp = "";
+let sessionOverrideRules = {};
+let seenAppNames = new Set();
+
+const CLASSIFICATION_RULE_STORAGE_KEY = "classificationRulesV1";
+const SESSION_OVERRIDE_STORAGE_KEY = "sessionOverrideRulesV1";
 
 const DEFAULT_PRODUCTIVE_APPS = [
   "vscode", "visual studio", "cursor", "intellij", "pycharm",
@@ -98,8 +116,289 @@ const restApps = ["calendar", "reminders", "clock", "alarm", "settings", "spotif
 let productiveApps = [...DEFAULT_PRODUCTIVE_APPS];
 let unproductiveApps = [...DEFAULT_UNPRODUCTIVE_APPS];
 
+const DEFAULT_CLASSIFICATION_RULES = [
+  ...DEFAULT_PRODUCTIVE_APPS.map(keyword => ({ keyword, classification: "productive", source: "built-in" })),
+  ...DEFAULT_UNPRODUCTIVE_APPS.map(keyword => ({ keyword, classification: "unproductive", source: "built-in" })),
+  ...[
+    "youtube tutorial",
+    "youtube how to",
+    "youtube course",
+    "youtube lecture",
+    "youtube guide",
+    "reddit tutorial",
+    "reddit how to",
+    "reddit guide",
+    "reddit walkthrough",
+    "documentation",
+    "docs",
+    "guide",
+    "how to",
+    "tutorial",
+    "lecture",
+    "course",
+    "webinar"
+  ].map(keyword => ({ keyword, classification: "productive", source: "built-in" }))
+];
+
+let classificationRules = loadClassificationRules();
+refreshDerivedAppLists();
+loadSessionOverrides();
+
 function getEl(id) {
   return document.getElementById(id);
+}
+
+function normalizeKeyword(text) {
+  return String(text || "").trim().toLowerCase();
+}
+
+function isTrackerWindow(windowTitle) {
+  const value = normalizeKeyword(windowTitle);
+  return value.includes("activity tracker dashboard") || value.includes("logger-app") || value.startsWith("electron");
+}
+
+function loadClassificationRules() {
+  try {
+    const raw = localStorage.getItem(CLASSIFICATION_RULE_STORAGE_KEY);
+    if (!raw) return DEFAULT_CLASSIFICATION_RULES.map((rule, index) => ({ id: `default-${index}`, ...rule }));
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error("Rules must be an array");
+
+    return parsed
+      .filter(rule => rule && rule.keyword && rule.classification)
+      .map((rule, index) => ({
+        id: rule.id || `rule-${index}-${Date.now()}`,
+        keyword: String(rule.keyword),
+        classification: rule.classification,
+        source: rule.source || "custom"
+      }));
+  } catch (err) {
+    console.warn("Falling back to default classification rules:", err && err.message);
+    return DEFAULT_CLASSIFICATION_RULES.map((rule, index) => ({ id: `default-${index}`, ...rule }));
+  }
+}
+
+function saveClassificationRules() {
+  localStorage.setItem(CLASSIFICATION_RULE_STORAGE_KEY, JSON.stringify(classificationRules));
+}
+
+function refreshDerivedAppLists() {
+  productiveApps = classificationRules
+    .filter(rule => rule.classification === "productive")
+    .map(rule => normalizeKeyword(rule.keyword))
+    .filter(Boolean);
+
+  unproductiveApps = classificationRules
+    .filter(rule => rule.classification === "unproductive")
+    .map(rule => normalizeKeyword(rule.keyword))
+    .filter(Boolean);
+}
+
+function renderOverrideTargetOptions() {
+  const select = getEl("overrideTargetApp");
+  if (!select) return;
+
+  const options = Array.from(seenAppNames)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  const currentValue = select.value || overrideTargetApp;
+  select.innerHTML = `<option value="">Select an app</option>` + options.map(name => `<option value="${name}">${name}</option>`).join("");
+
+  if (currentValue && options.includes(currentValue)) {
+    select.value = currentValue;
+  }
+}
+
+function getSelectedOverrideTarget() {
+  const select = getEl("overrideTargetApp");
+  return (select && select.value) || overrideTargetApp || lastActiveAppName || "";
+}
+
+function updateOverrideStatus() {
+  const currentLabel = getEl("overrideCurrentApp");
+  const statusLabel = getEl("overrideStatus");
+  const target = getSelectedOverrideTarget();
+  const rule = target ? sessionOverrideRules[normalizeKeyword(target)] : null;
+
+  if (currentLabel) {
+    currentLabel.textContent = target || "No target selected";
+  }
+
+  if (statusLabel) {
+    if (!target) {
+      statusLabel.textContent = "No manual override for this app.";
+    } else if (rule) {
+      statusLabel.textContent = `${target} is currently marked as ${rule}.`;
+    } else {
+      statusLabel.textContent = `No manual override set for ${target}.`;
+    }
+  }
+}
+
+function persistSessionOverrides() {
+  localStorage.setItem(SESSION_OVERRIDE_STORAGE_KEY, JSON.stringify(sessionOverrideRules));
+}
+
+function clearSessionOverrides() {
+  sessionOverrideRules = {};
+  overrideTargetApp = "";
+  seenAppNames = new Set();
+  localStorage.removeItem(SESSION_OVERRIDE_STORAGE_KEY);
+  renderOverrideTargetOptions();
+  updateOverrideStatus();
+}
+
+function loadSessionOverrides() {
+  try {
+    const raw = localStorage.getItem(SESSION_OVERRIDE_STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      sessionOverrideRules = parsed;
+    }
+  } catch (err) {
+    console.warn("Failed to load session overrides:", err && err.message);
+  }
+}
+
+function normalizeWindowActivity(windowTitle) {
+  const rawTitle = String(windowTitle || "").trim();
+  if (!rawTitle) {
+    return { appName: "Unknown", tabName: "Unknown", titleForRules: "", isTracker: false };
+  }
+
+  if (isTrackerWindow(rawTitle)) {
+    return {
+      appName: "Tracker",
+      tabName: "Tracker Dashboard",
+      titleForRules: rawTitle,
+      isTracker: true
+    };
+  }
+
+  let appName = rawTitle;
+  let tabName = rawTitle;
+
+  if (rawTitle.includes(" - ")) {
+    const parts = rawTitle.split(" - ");
+    appName = parts[0];
+    tabName = parts.slice(1).join(" - ");
+  } else if (rawTitle.includes(" | ")) {
+    const parts = rawTitle.split(" | ");
+    appName = parts[parts.length - 1];
+    tabName = parts.slice(0, -1).join(" | ");
+  }
+
+  appName = appName.replace(/\.exe$/i, "").trim();
+  tabName = tabName.trim();
+
+  if (!tabName) tabName = appName;
+  if (!appName) appName = tabName;
+
+  if (tabName.length > 50) tabName = `${tabName.slice(0, 47)}...`;
+  if (appName.length > 25) appName = `${appName.slice(0, 22)}...`;
+
+  return { appName, tabName, titleForRules: rawTitle, isTracker: false };
+}
+
+function renderAppRules() {
+  const list = getEl("appRulesList");
+  const empty = getEl("appRulesEmpty");
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  if (!classificationRules.length) {
+    if (empty) empty.style.display = "block";
+    return;
+  }
+
+  if (empty) empty.style.display = "none";
+
+  classificationRules.forEach(rule => {
+    const row = document.createElement("div");
+    row.className = "app-rule-row";
+    row.dataset.ruleId = rule.id;
+
+    row.innerHTML = `
+      <input class="app-rule-name" type="text" value="${rule.keyword.replace(/"/g, '&quot;')}">
+      <div class="app-rule-check"><input type="radio" name="rule-${rule.id}" value="productive" ${rule.classification === "productive" ? "checked" : ""}></div>
+      <div class="app-rule-check"><input type="radio" name="rule-${rule.id}" value="unproductive" ${rule.classification === "unproductive" ? "checked" : ""}></div>
+      <button class="app-rule-remove" type="button">Remove</button>
+    `;
+
+    const nameInput = row.querySelector(".app-rule-name");
+    const radios = row.querySelectorAll('input[type="radio"]');
+    const removeBtn = row.querySelector(".app-rule-remove");
+
+    nameInput.addEventListener("change", () => {
+      const nextKeyword = normalizeKeyword(nameInput.value);
+      if (!nextKeyword) {
+        nameInput.value = rule.keyword;
+        return;
+      }
+
+      rule.keyword = nextKeyword;
+      saveClassificationRules();
+      refreshDerivedAppLists();
+    });
+
+    radios.forEach(radio => {
+      radio.addEventListener("change", () => {
+        if (!radio.checked) return;
+        rule.classification = radio.value;
+        saveClassificationRules();
+        refreshDerivedAppLists();
+      });
+    });
+
+    removeBtn.addEventListener("click", () => {
+      classificationRules = classificationRules.filter(item => item.id !== rule.id);
+      saveClassificationRules();
+      refreshDerivedAppLists();
+      renderAppRules();
+    });
+
+    list.appendChild(row);
+  });
+}
+
+function addClassificationRule(keyword, classification) {
+  const normalized = normalizeKeyword(keyword);
+  if (!normalized) return;
+
+  classificationRules.unshift({
+    id: `rule-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    keyword: normalized,
+    classification,
+    source: "custom"
+  });
+
+  saveClassificationRules();
+  refreshDerivedAppLists();
+  renderAppRules();
+}
+
+function setSessionOverride(targetApp, classification) {
+  const target = normalizeKeyword(targetApp);
+  if (!target) return;
+
+  sessionOverrideRules[target] = classification;
+  overrideTargetApp = targetApp;
+  persistSessionOverrides();
+  updateOverrideStatus();
+}
+
+function clearSessionOverride(targetApp) {
+  const target = normalizeKeyword(targetApp);
+  if (!target) return;
+
+  delete sessionOverrideRules[target];
+  persistSessionOverrides();
+  updateOverrideStatus();
 }
 
 function updateDateDisplay() {
@@ -202,19 +501,29 @@ function extractAppAndTitle(windowTitle) {
 }
 
 function categorizeApp(appName) {
-  if (breakActive) return "rest";
+  const normalized = normalizeWindowActivity(appName);
+  const haystack = [normalized.appName, normalized.tabName, normalized.titleForRules]
+    .map(normalizeKeyword)
+    .filter(Boolean)
+    .join(" ");
 
-  const lowerName = appName.toLowerCase();
-  const educationalKeywords = ["tutorial", "lesson", "lecture", "course", "class", "walkthrough", "how to", "documentation", "docs", "guide", "webinar"];
-  const learningIntent = educationalKeywords.some(keyword => lowerName.includes(keyword));
+  if (normalized.isTracker || breakActive) return "rest";
 
-  if ((lowerName.includes("youtube") || lowerName.includes("facebook") || lowerName.includes("reddit")) && learningIntent) {
-    return "productive";
+  const override = sessionOverrideRules[normalizeKeyword(normalized.appName)];
+  if (override) return override;
+
+  const orderedRules = [...classificationRules].sort((a, b) => normalizeKeyword(b.keyword).length - normalizeKeyword(a.keyword).length);
+
+  for (const rule of orderedRules) {
+    const keyword = normalizeKeyword(rule.keyword);
+    if (keyword && haystack.includes(keyword)) {
+      return rule.classification;
+    }
   }
 
-  for (const app of productiveApps) if (lowerName.includes(app)) return "productive";
-  for (const app of unproductiveApps) if (lowerName.includes(app)) return "unproductive";
-  for (const app of restApps) if (lowerName.includes(app)) return "rest";
+  for (const app of productiveApps) if (haystack.includes(app)) return "productive";
+  for (const app of unproductiveApps) if (haystack.includes(app)) return "unproductive";
+  for (const app of restApps) if (haystack.includes(app)) return "rest";
 
   return "unknown";
 }
@@ -224,16 +533,21 @@ async function startSession() {
   const data = await res.json();
   currentSessionId = data.session_id;
   localStorage.setItem("currentSessionId", currentSessionId);
+  clearSessionOverrides();
   loadSessions();
 }
 
 function clearDashboardActivity() {
   currentWindowName = "";
+  lastActiveAppName = "";
+  lastActiveWindowTitle = "";
   lastEntry = null;
   lastTimestamp = null;
   timeSpent = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
   weeklyData = {};
   monthlyData = {};
+  seenAppNames = new Set();
+  clearSessionOverrides();
 
   if (logEl) {
     logEl.innerHTML = "";
@@ -282,14 +596,18 @@ async function stopSession() {
 async function saveLogToDatabase(windowTitle) {
   if (!currentSessionId) return;
 
-  const extracted = extractAppAndTitle(windowTitle);
+  const extracted = normalizeWindowActivity(windowTitle);
+  
+  // Don't log the tracker window itself
+  if (extracted.isTracker) return;
+
   await fetch("http://127.0.0.1:5000/logs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       session_id: Number(currentSessionId),
       app_name: extracted.appName,
-      window_title: windowTitle
+      window_title: extracted.tabName || extracted.appName
     })
   });
 }
@@ -375,7 +693,12 @@ async function loadSessionLogs(sessionId) {
 function addToLog(windowName, timestamp) {
   if (!logEl) return;
 
-  const { tabName, appName } = extractAppAndTitle(windowName);
+  const normalized = normalizeWindowActivity(windowName);
+  
+  // Don't add tracker window to visible log
+  if (normalized.isTracker) return;
+
+  const { tabName, appName } = normalized;
   const category = categorizeApp(windowName);
   const categoryColor = customColors[category] || customColors.unknown;
   const timeStr = timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -501,8 +824,7 @@ function buildStackedBarChart(canvasId, chartRef, labels, dataPoints, monthMode 
       datasets: [
         { label: "Productive", data: dataPoints.map(d => d.productive), backgroundColor: customColors.productive, borderRadius: 4 },
         { label: "Unproductive", data: dataPoints.map(d => d.unproductive), backgroundColor: customColors.unproductive, borderRadius: 4 },
-        { label: "Rest", data: dataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 },
-        { label: "Unknown", data: dataPoints.map(d => d.unknown), backgroundColor: customColors.unknown, borderRadius: 4 }
+        { label: "Rest", data: dataPoints.map(d => d.rest), backgroundColor: customColors.rest, borderRadius: 4 }
       ]
     },
     options: {
@@ -528,8 +850,7 @@ function updateWeeklyCharts() {
     day,
     productive: weeklyData[day]?.productive || 0,
     unproductive: weeklyData[day]?.unproductive || 0,
-    rest: weeklyData[day]?.rest || 0,
-    unknown: weeklyData[day]?.unknown || 0
+    rest: weeklyData[day]?.rest || 0
   }));
   weeklyChart = buildStackedBarChart("weeklyChart", weeklyChart, last7Days, weeklyDataPoints, false);
 }
@@ -540,8 +861,7 @@ function updateMonthlyCharts() {
     week,
     productive: monthlyData[week]?.productive || 0,
     unproductive: monthlyData[week]?.unproductive || 0,
-    rest: monthlyData[week]?.rest || 0,
-    unknown: monthlyData[week]?.unknown || 0
+    rest: monthlyData[week]?.rest || 0
   }));
   monthlyChart = buildStackedBarChart("monthlyChart", monthlyChart, weeks, monthlyDataPoints, false);
 }
@@ -552,8 +872,7 @@ function updateWeeklyFullView() {
     day,
     productive: weeklyData[day]?.productive || 0,
     unproductive: weeklyData[day]?.unproductive || 0,
-    rest: weeklyData[day]?.rest || 0,
-    unknown: weeklyData[day]?.unknown || 0
+    rest: weeklyData[day]?.rest || 0
   }));
   weeklyChartFull = buildStackedBarChart("weeklyChartFull", weeklyChartFull, last7Days, weeklyDataPoints, true);
 }
@@ -564,8 +883,7 @@ function updateMonthlyFullView() {
     week,
     productive: monthlyData[week]?.productive || 0,
     unproductive: monthlyData[week]?.unproductive || 0,
-    rest: monthlyData[week]?.rest || 0,
-    unknown: monthlyData[week]?.unknown || 0
+    rest: monthlyData[week]?.rest || 0
   }));
   monthlyChartFull = buildStackedBarChart("monthlyChartFull", monthlyChartFull, weeks, monthlyDataPoints, true);
 }
@@ -586,8 +904,6 @@ if (resetBtn && logDiv) {
     const ok = confirm("Reset the current dashboard log?");
     if (!ok) return;
 
-    logDiv.innerHTML = "";
-    addLogHeader();
     clearDashboardActivity();
   });
 }
@@ -605,6 +921,11 @@ navBtns.forEach(btn => {
 
 if (takeBreakBtn && breakModal) {
   takeBreakBtn.addEventListener("click", () => {
+    if (!isTracking) {
+      alert("Session not started yet. Please start a session first before taking a break.");
+      return;
+    }
+
     breakModal.style.display = "block";
   });
 }
@@ -709,6 +1030,83 @@ if (generateSummaryBtn) {
   });
 }
 
+if (overrideTargetSelect) {
+  overrideTargetSelect.addEventListener("change", () => {
+    overrideTargetApp = overrideTargetSelect.value;
+    updateOverrideStatus();
+  });
+}
+
+if (useLastActiveAppBtn) {
+  useLastActiveAppBtn.addEventListener("click", () => {
+    const target = lastActiveAppName || normalizeWindowActivity(lastActiveWindowTitle).appName;
+    if (!target) {
+      updateOverrideStatus();
+      return;
+    }
+
+    overrideTargetApp = target;
+    if (overrideTargetSelect) overrideTargetSelect.value = target;
+    updateOverrideStatus();
+  });
+}
+
+if (markProductiveBtn) {
+  markProductiveBtn.addEventListener("click", () => {
+    const target = getSelectedOverrideTarget();
+    if (!target) return;
+    setSessionOverride(target, "productive");
+  });
+}
+
+if (markUnproductiveBtn) {
+  markUnproductiveBtn.addEventListener("click", () => {
+    const target = getSelectedOverrideTarget();
+    if (!target) return;
+    setSessionOverride(target, "unproductive");
+  });
+}
+
+if (markRestBtn) {
+  markRestBtn.addEventListener("click", () => {
+    const target = getSelectedOverrideTarget();
+    if (!target) return;
+    setSessionOverride(target, "rest");
+  });
+}
+
+if (markUnknownBtn) {
+  markUnknownBtn.addEventListener("click", () => {
+    const target = getSelectedOverrideTarget();
+    if (!target) return;
+    setSessionOverride(target, "unknown");
+  });
+}
+
+if (clearCurrentOverrideBtn) {
+  clearCurrentOverrideBtn.addEventListener("click", () => {
+    const target = getSelectedOverrideTarget();
+    if (!target) return;
+    clearSessionOverride(target);
+  });
+}
+
+if (addProductiveKeywordBtn) {
+  addProductiveKeywordBtn.addEventListener("click", () => {
+    addClassificationRule(appKeywordInput ? appKeywordInput.value : "", "productive");
+    if (appKeywordInput) appKeywordInput.value = "";
+    renderAppRules();
+  });
+}
+
+if (addUnproductiveKeywordBtn) {
+  addUnproductiveKeywordBtn.addEventListener("click", () => {
+    addClassificationRule(appKeywordInput ? appKeywordInput.value : "", "unproductive");
+    if (appKeywordInput) appKeywordInput.value = "";
+    renderAppRules();
+  });
+}
+
 if (toggleTrackingBtn) {
   toggleTrackingBtn.addEventListener("click", async () => {
     try {
@@ -731,37 +1129,50 @@ if (window.api && window.api.onUpdate) {
   window.api.onUpdate(data => {
     const now = new Date();
     currentWindowName = data.current || "No active window";
+    const normalized = normalizeWindowActivity(currentWindowName);
+    if (!normalized.isTracker) {
+      lastActiveAppName = normalized.appName;
+      lastActiveWindowTitle = normalized.tabName;
+      seenAppNames.add(normalized.appName);
+      renderOverrideTargetOptions();
+      updateOverrideStatus();
+    }
 
-    saveLogToDatabase(currentWindowName).catch(err => {
+    saveLogToDatabase(normalized.isTracker ? normalized.appName : currentWindowName).catch(err => {
       console.error("Failed to save log:", err);
     });
 
     if (lastEntry && lastTimestamp && lastEntry !== currentWindowName) {
       const timeDiff = (now - lastTimestamp) / 1000 / 60;
-      const category = categorizeApp(lastEntry);
-      timeSpent[category] += timeDiff;
+      
+      // Don't count tracker window time in statistics
+      const lastNormalized = normalizeWindowActivity(lastEntry);
+      if (!lastNormalized.isTracker) {
+        const category = categorizeApp(lastEntry);
+        timeSpent[category] += timeDiff;
 
-      const dayKey = now.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric"
-      });
-      const weekKey = `Week ${Math.ceil(now.getDate() / 7)}`;
+        const dayKey = now.toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric"
+        });
+        const weekKey = `Week ${Math.ceil(now.getDate() / 7)}`;
 
-      if (!weeklyData[dayKey]) {
-        weeklyData[dayKey] = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
+        if (!weeklyData[dayKey]) {
+          weeklyData[dayKey] = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
+        }
+        if (!monthlyData[weekKey]) {
+          monthlyData[weekKey] = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
+        }
+
+        weeklyData[dayKey][category] += timeDiff;
+        monthlyData[weekKey][category] += timeDiff;
       }
-      if (!monthlyData[weekKey]) {
-        monthlyData[weekKey] = { productive: 0, unproductive: 0, rest: 0, unknown: 0 };
-      }
-
-      weeklyData[dayKey][category] += timeDiff;
-      monthlyData[weekKey][category] += timeDiff;
     }
 
     updateChart();
     updateLegend();
-    addToLog(currentWindowName, now);
+    addToLog(normalized.isTracker ? normalized.appName : currentWindowName, now);
     updateWeeklyCharts();
     updateMonthlyCharts();
 
@@ -778,6 +1189,10 @@ if (window.api && window.api.onTrackingStatus) {
     if (toggleTrackingBtn) {
       toggleTrackingBtn.textContent = isTracking ? "Stop Session" : "Start Session";
       toggleTrackingBtn.classList.toggle("active", isTracking);
+    }
+
+    if (takeBreakBtn) {
+      takeBreakBtn.classList.toggle("disabled", !isTracking);
     }
 
     if (wasTracking === true && !isTracking) {
@@ -797,6 +1212,10 @@ addLogHeader();
 updateDateDisplay();
 setInterval(updateDateDisplay, 1000);
 updateFontSize();
+refreshDerivedAppLists();
+renderAppRules();
+renderOverrideTargetOptions();
+updateOverrideStatus();
 loadSessions();
 
 console.log("Dashboard Loaded ✨");
