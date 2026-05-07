@@ -2,7 +2,7 @@
 
 ## Overview
 
-Prodini is an interstitial journaling app that helps users become more aware of how they spend their time. It automatically tracks desktop activity and encourages frequent reflection by showing activity logs in a clean interface. Instead of relying only on manual journaling, Prodini connects real computer usage with mindful productivity tracking. Prodini combines activity tracking, productivity statistics, and visual summaries in a clean and simple interface, allowing users to better understand their focus patterns, distractions, and daily workflow.
+Prodini is an interstitial journaling app that tracks your desktop activity in real time, turning everyday work into continuous, structured reflection. It reveals how your time is actually spent through clean, automatic logs and focused insights into your workflow patterns. With timely, context-aware notifications that prompt reflection in the moment, it makes sure your attention stays exactly where it needs to be.
 
 ---
 
@@ -17,15 +17,6 @@ Prodini is an interstitial journaling app that helps users become more aware of 
 * Break timer and productivity balance support
 * Customizable productivity classifications
 * Interactive activity charts and reports
-
----
-
-## Tech Stack
-
-* **Frontend:** Electron (HTML, CSS, JavaScript)
-* **Backend:** Flask
-* **Database:** SQLite (via SQLAlchemy)
-* **Other Tools:** active-win, xdotool
 
 ---
 
