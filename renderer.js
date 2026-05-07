@@ -1129,6 +1129,7 @@ if (window.api && window.api.onUpdate) {
   window.api.onUpdate(data => {
     const now = new Date();
     currentWindowName = data.current || "No active window";
+    updateUnproductiveSessionState(currentWindowName);
     const normalized = normalizeWindowActivity(currentWindowName);
     if (!normalized.isTracker) {
       lastActiveAppName = normalized.appName;
@@ -1197,6 +1198,15 @@ if (window.api && window.api.onTrackingStatus) {
 
     if (wasTracking === true && !isTracking) {
       clearDashboardActivity();
+      stopUnproductiveMonitor();
+      hideInactivityNotification();
+    }
+
+    // Start unproductive monitor when session begins
+    if (wasTracking === false && isTracking) {
+      resetAlertHistoryForSession();
+      startUnproductiveMonitor();
+      updateUnproductiveSessionState(currentWindowName);
     }
 
     lastTrackingStatus = isTracking;
@@ -1218,4 +1228,418 @@ renderOverrideTargetOptions();
 updateOverrideStatus();
 loadSessions();
 
-console.log("Dashboard Loaded ✨");
+// ============================================
+// NOTIFICATION SYSTEM
+// ============================================
+
+// Notification Settings Storage
+const NOTIFICATION_SETTINGS_KEY = "notificationSettingsV1";
+
+let notificationSettings = {
+  enabled: true,
+  inactivityTimeout: 1, // in minutes
+  soundMode: "normal" // soft, normal, hard
+};
+
+let unproductiveStartTime = null;
+let unproductiveAlertTriggered = false;
+let unproductiveMonitorInterval = null;
+let notificationShown = false;
+let alertHistory = [];
+
+function resetAlertHistoryForSession() {
+  alertHistory = [];
+  renderAlertHistorySummary();
+}
+
+function formatAlertTime(isoTime) {
+  const date = new Date(isoTime);
+  if (Number.isNaN(date.getTime())) return "Unknown time";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function renderAlertHistorySummary() {
+  const totalEl = document.getElementById("totalAlertCount");
+  const unproductiveEl = document.getElementById("unproductiveAlertCount");
+  const listEl = document.getElementById("unproductiveAlertHistory");
+  if (!totalEl || !unproductiveEl || !listEl) return;
+
+  const unproductiveAlerts = alertHistory.filter(item => item.category === "unproductive");
+  totalEl.textContent = String(alertHistory.length);
+  unproductiveEl.textContent = String(unproductiveAlerts.length);
+
+  if (!unproductiveAlerts.length) {
+    listEl.textContent = "No alerts yet.";
+    return;
+  }
+
+  const recent = unproductiveAlerts.slice(0, 8);
+  listEl.innerHTML = recent.map(item => {
+    const app = (item.window || "Unknown").replace(/[<>]/g, "");
+    return `<div class="notification-history-entry">${formatAlertTime(item.timestamp)} - ${app}</div>`;
+  }).join("");
+}
+
+function recordAlertEvent(category, windowName, source) {
+  alertHistory.unshift({
+    timestamp: new Date().toISOString(),
+    category: category || "unknown",
+    window: windowName || "Unknown",
+    source: source || "idle"
+  });
+
+  if (alertHistory.length > 200) {
+    alertHistory = alertHistory.slice(0, 200);
+  }
+
+  renderAlertHistorySummary();
+}
+
+function updateUnproductiveSessionState(windowName) {
+  if (!isTracking) {
+    unproductiveStartTime = null;
+    unproductiveAlertTriggered = false;
+    return;
+  }
+
+  const activeWindow = String(windowName || "");
+  if (!activeWindow || isTrackerWindow(activeWindow)) {
+    unproductiveStartTime = null;
+    unproductiveAlertTriggered = false;
+    return;
+  }
+
+  const category = categorizeApp(activeWindow);
+  if (category !== "unproductive") {
+    unproductiveStartTime = null;
+    unproductiveAlertTriggered = false;
+    return;
+  }
+
+  if (!unproductiveStartTime) {
+    unproductiveStartTime = Date.now();
+    unproductiveAlertTriggered = false;
+  }
+}
+
+function checkUnproductiveDuration() {
+  if (!isTracking || !notificationSettings.enabled) return;
+  if (!unproductiveStartTime || unproductiveAlertTriggered) return;
+
+  const thresholdMs = notificationSettings.inactivityTimeout * 60 * 1000;
+  const elapsedMs = Date.now() - unproductiveStartTime;
+
+  if (elapsedMs >= thresholdMs) {
+    const elapsedMinutes = Math.max(1, Math.floor(elapsedMs / 60000));
+    showInactivityNotification("unproductive-duration", elapsedMinutes);
+    unproductiveAlertTriggered = true;
+  }
+}
+
+function startUnproductiveMonitor() {
+  if (unproductiveMonitorInterval) return;
+  unproductiveMonitorInterval = setInterval(checkUnproductiveDuration, 1000);
+}
+
+function stopUnproductiveMonitor() {
+  if (unproductiveMonitorInterval) {
+    clearInterval(unproductiveMonitorInterval);
+    unproductiveMonitorInterval = null;
+  }
+
+  unproductiveStartTime = null;
+  unproductiveAlertTriggered = false;
+}
+
+/**
+ * Load notification settings from localStorage
+ */
+function loadNotificationSettings() {
+  try {
+    const saved = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      notificationSettings = { ...notificationSettings, ...parsed };
+    }
+  } catch (err) {
+    console.warn("Failed to load notification settings:", err);
+  }
+  updateNotificationSettingsUI();
+}
+
+/**
+ * Save notification settings to localStorage
+ */
+function saveNotificationSettings() {
+  try {
+    localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(notificationSettings));
+  } catch (err) {
+    console.warn("Failed to save notification settings:", err);
+  }
+}
+
+/**
+ * Update UI elements with current notification settings
+ */
+function updateNotificationSettingsUI() {
+  const timeoutInput = document.getElementById("inactivityTimeout");
+  const soundModeSelect = document.getElementById("notificationSoundMode");
+  const enableCheckbox = document.getElementById("enableNotifications");
+
+  if (timeoutInput) timeoutInput.value = notificationSettings.inactivityTimeout;
+  if (soundModeSelect) soundModeSelect.value = notificationSettings.soundMode;
+  if (enableCheckbox) enableCheckbox.checked = notificationSettings.enabled;
+
+  renderAlertHistorySummary();
+}
+
+/**
+ * Generate notification sound using Web Audio API with improved alarm patterns
+ * @param {string} mode - "soft", "normal", or "hard"
+ */
+function playNotificationSound(mode = "normal") {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    if (mode === "soft") {
+      // Soft: Single gentle chirp (ascending then descending)
+      playChirp(audioContext, 400, 600, 0.4, 0.2);
+    } else if (mode === "normal") {
+      // Normal: Classic alarm pattern (beep-beep-pause repeated)
+      playAlarmPattern(audioContext, [
+        { freq: 800, duration: 0.15 },
+        { freq: 0, duration: 0.1 },
+        { freq: 800, duration: 0.15 },
+        { freq: 0, duration: 0.2 },
+        { freq: 900, duration: 0.15 },
+        { freq: 0, duration: 0.1 },
+        { freq: 900, duration: 0.15 }
+      ], 0.6);
+    } else if (mode === "hard") {
+      // Hard: Loud multi-frequency alarm
+      playAlarmPattern(audioContext, [
+        { freq: 1000, duration: 0.1 },
+        { freq: 0, duration: 0.05 },
+        { freq: 1000, duration: 0.1 },
+        { freq: 0, duration: 0.05 },
+        { freq: 1200, duration: 0.1 },
+        { freq: 0, duration: 0.05 },
+        { freq: 1200, duration: 0.1 },
+        { freq: 0, duration: 0.1 },
+        { freq: 1000, duration: 0.15 },
+        { freq: 0, duration: 0.05 },
+        { freq: 1200, duration: 0.15 }
+      ], 0.85);
+    }
+  } catch (err) {
+    console.warn("Failed to play notification sound:", err);
+  }
+}
+
+/**
+ * Play a chirp sound (ascending then descending frequency)
+ */
+function playChirp(audioContext, startFreq, endFreq, duration, volume) {
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  const now = audioContext.currentTime;
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  // Frequency sweep from start to end
+  oscillator.frequency.setValueAtTime(startFreq, now);
+  oscillator.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
+  
+  oscillator.type = "sine";
+
+  gainNode.gain.setValueAtTime(volume, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+  oscillator.start(now);
+  oscillator.stop(now + duration);
+}
+
+/**
+ * Play an alarm pattern with multiple beeps
+ */
+function playAlarmPattern(audioContext, pattern, volume) {
+  let currentTime = audioContext.currentTime;
+
+  pattern.forEach((tone) => {
+    if (tone.freq === 0) {
+      // Silence
+      currentTime += tone.duration;
+    } else {
+      // Beep with frequency sweep
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.setValueAtTime(tone.freq, currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(tone.freq * 0.9, currentTime + tone.duration);
+      oscillator.type = "sine";
+
+      gainNode.gain.setValueAtTime(volume, currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + tone.duration);
+
+      oscillator.start(currentTime);
+      oscillator.stop(currentTime + tone.duration);
+
+      currentTime += tone.duration;
+    }
+  });
+}
+
+/**
+ * Show inactivity notification popup
+ */
+function showInactivityNotification(source = "idle") {
+  const notification = document.getElementById("inactivityNotification");
+  const messageEl = document.querySelector(".notification-message");
+  if (!notification) {
+    console.warn("Notification element not found in DOM");
+    return;
+  }
+
+  const activeWindow = currentWindowName || "Unknown";
+  const category = categorizeApp(activeWindow);
+  recordAlertEvent(category, activeWindow, source);
+
+  if (messageEl) {
+    const unproductiveCount = alertHistory.filter(item => item.category === "unproductive").length;
+    messageEl.textContent = `You're staying too long in an unproductive app. Unproductive alerts so far: ${unproductiveCount}. Click to return to tracking.`;
+  }
+
+  notificationShown = true;
+  notification.classList.add("show");
+  console.log("Inactivity notification shown with sound mode:", notificationSettings.soundMode);
+
+  if (window.api && window.api.showNativeNotification) {
+    window.api.showNativeNotification({
+      title: "Prodini - Unproductive App Alert",
+      body: `You've been on an unproductive app for ${notificationSettings.inactivityTimeout} minute(s). App: ${activeWindow}`
+    });
+  }
+
+  // Play sound
+  if (notificationSettings.enabled) {
+    playNotificationSound(notificationSettings.soundMode);
+  }
+
+  // Auto-hide after 10 seconds
+  setTimeout(() => {
+    hideInactivityNotification();
+  }, 10000);
+}
+
+/**
+ * Hide inactivity notification popup
+ */
+function hideInactivityNotification() {
+  const notification = document.getElementById("inactivityNotification");
+  if (notification) {
+    notification.classList.remove("show");
+    notificationShown = false;
+  }
+}
+
+/**
+ * Check unproductive duration monitor state
+ */
+function resetInactivityTimer() {
+  updateUnproductiveSessionState(currentWindowName);
+}
+
+/**
+ * Setup notification UI event listeners
+ */
+function setupNotificationUI() {
+  const enableCheckbox = document.getElementById("enableNotifications");
+  const timeoutInput = document.getElementById("inactivityTimeout");
+  const soundModeSelect = document.getElementById("notificationSoundMode");
+  const notificationCloseBtn = document.querySelector(".notification-close");
+  const notificationActionBtn = document.querySelector(".notification-action-btn");
+
+  // Settings change handlers
+  if (enableCheckbox) {
+    enableCheckbox.addEventListener("change", () => {
+      notificationSettings.enabled = enableCheckbox.checked;
+      saveNotificationSettings();
+      if (isTracking && notificationSettings.enabled) {
+        startUnproductiveMonitor();
+        updateUnproductiveSessionState(currentWindowName);
+      } else if (!notificationSettings.enabled) {
+        stopUnproductiveMonitor();
+        hideInactivityNotification();
+      }
+    });
+  }
+
+  if (timeoutInput) {
+    timeoutInput.addEventListener("change", () => {
+      const value = parseInt(timeoutInput.value);
+      if (value >= 1 && value <= 60) {
+        notificationSettings.inactivityTimeout = value;
+        saveNotificationSettings();
+        if (isTracking) {
+          updateUnproductiveSessionState(currentWindowName);
+        }
+      }
+    });
+  }
+
+  if (soundModeSelect) {
+    soundModeSelect.addEventListener("change", () => {
+      notificationSettings.soundMode = soundModeSelect.value;
+      saveNotificationSettings();
+    });
+  }
+
+  // Notification popup close button
+  if (notificationCloseBtn) {
+    notificationCloseBtn.addEventListener("click", () => {
+      console.log("✕ Notification closed by user");
+      hideInactivityNotification();
+    });
+  }
+
+  // Notification popup action button - redirect to app
+  if (notificationActionBtn) {
+    notificationActionBtn.addEventListener("click", () => {
+      console.log("↩️ Returning to tracking from notification");
+      hideInactivityNotification();
+      // Focus on the main window/app
+      if (window.api && window.api.focusApp) {
+        window.api.focusApp();
+      }
+      // Switch to home view
+      const homeBtn = document.querySelector('[data-view="home"]');
+      if (homeBtn) {
+        homeBtn.click();
+      }
+    });
+  }
+
+  if (window.api && window.api.onNativeNotificationClick) {
+    window.api.onNativeNotificationClick(() => {
+      hideInactivityNotification();
+      const homeBtn = document.querySelector('[data-view="home"]');
+      if (homeBtn) homeBtn.click();
+    });
+  }
+}
+
+// Load settings on startup
+loadNotificationSettings();
+setupNotificationUI();
+
+console.log("🎯 Dashboard Loaded ✨");
+console.log("📢 Notification system initialized - Settings:", notificationSettings);

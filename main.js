@@ -8,7 +8,7 @@
 // - Log user activity to files and send updates to the renderer
 // ============================================
 
-const { app, BrowserWindow, ipcMain, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu, Notification } = require("electron");
 const path = require("path");
 const { getActiveWindow } = require("./tracker"); // Import window tracking module
 const fs = require("fs");
@@ -165,6 +165,41 @@ ipcMain.on("start-tracking", () => {
 // Listen for "stop-tracking" message from the renderer process
 ipcMain.on("stop-tracking", () => {
   stopTracking();
+});
+
+// Listen for "focus-app" message from the renderer process
+// Brings the window to focus when notification is clicked
+ipcMain.on("focus-app", () => {
+  if (win && !win.isDestroyed()) {
+    win.show();
+    win.focus();
+  }
+});
+
+// Listen for "show-native-notification" message from renderer
+// Displays a Windows native notification (Action Center on Windows)
+ipcMain.on("show-native-notification", (event, payload = {}) => {
+  try {
+    if (!Notification.isSupported()) return;
+
+    const nativeNotification = new Notification({
+      title: payload.title || "Prodini Alert",
+      body: payload.body || "Unproductive app duration detected.",
+      silent: false
+    });
+
+    nativeNotification.on("click", () => {
+      if (win && !win.isDestroyed()) {
+        win.show();
+        win.focus();
+        win.webContents.send("native-notification-click");
+      }
+    });
+
+    nativeNotification.show();
+  } catch (err) {
+    console.error("Failed to show native notification:", err && err.message ? err.message : err);
+  }
 });
 
 // ============== APPLICATION LIFECYCLE ==============

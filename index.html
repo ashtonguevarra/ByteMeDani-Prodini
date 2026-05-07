@@ -189,6 +189,47 @@
         </div>
       </div>
 
+      <!-- NOTIFICATION SETTINGS -->
+      <div class="notification-settings-section">
+        <div class="settings-section-title">Unproductive App Notifications</div>
+        
+        <div class="notification-controls">
+          <div class="notification-item">
+            <label for="inactivityTimeout">Notify after unproductive (minutes):</label>
+            <input type="number" id="inactivityTimeout" min="1" max="60" value="1">
+          </div>
+
+          <div class="notification-item">
+            <label for="notificationSoundMode">Sound Mode:</label>
+            <select id="notificationSoundMode">
+              <option value="soft">Soft</option>
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+
+          <div class="notification-item">
+            <label>
+              <input type="checkbox" id="enableNotifications" checked>
+              <span>Enable Notifications</span>
+            </label>
+          </div>
+
+          <div class="notification-history-panel">
+            <div class="notification-history-row">
+              <span>Total alerts:</span>
+              <strong id="totalAlertCount">0</strong>
+            </div>
+            <div class="notification-history-row">
+              <span>Unproductive alerts:</span>
+              <strong id="unproductiveAlertCount">0</strong>
+            </div>
+            <div class="notification-history-title">Recent unproductive alerts</div>
+            <div id="unproductiveAlertHistory" class="notification-history-list">No alerts yet.</div>
+          </div>
+        </div>
+      </div>
+
       <div class="settings-two-column">
         <div class="settings-card">
           <div class="settings-section-title">Manual Classification Override (Session)</div>
@@ -239,6 +280,18 @@
       </div>
 
       <button id="applyColors" class="apply-btn">Apply</button>
+    </div>
+  </div>
+
+  <!-- INACTIVITY NOTIFICATION POPUP -->
+  <div id="inactivityNotification" class="inactivity-notification">
+    <div class="notification-content">
+      <div class="notification-header">
+        <h4>⚠️ Unproductive Time Alert</h4>
+        <button class="notification-close">&times;</button>
+      </div>
+      <p class="notification-message">You've been in an unproductive app for too long. Click here to return to tracking.</p>
+      <button class="notification-action-btn">Return to Tracking</button>
     </div>
   </div>
 

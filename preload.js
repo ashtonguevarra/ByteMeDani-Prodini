@@ -41,5 +41,24 @@ contextBridge.exposeInMainWorld("api", {
    */
   onTrackingStatus: (callback) => {
     ipcRenderer.on("tracking-status", (event, status) => callback(status));
+  },
+
+  /**
+   * Request the main process to focus/bring the app window to front
+   */
+  focusApp: () => ipcRenderer.send("focus-app"),
+
+  /**
+   * Show a native OS notification (Windows Action Center on Windows)
+   * @param {{title?: string, body?: string}} payload
+   */
+  showNativeNotification: (payload) => ipcRenderer.send("show-native-notification", payload || {}),
+
+  /**
+   * Register callback for native notification click event from main process
+   * @param {Function} callback
+   */
+  onNativeNotificationClick: (callback) => {
+    ipcRenderer.on("native-notification-click", () => callback());
   }
 });
