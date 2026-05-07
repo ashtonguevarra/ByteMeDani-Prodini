@@ -23,7 +23,8 @@ const cancelBreakBtn = document.getElementById("cancelBreakBtn");
 const activeBreakBar = document.getElementById("activeBreakBar");
 const breakTimerDisplay = document.getElementById("breakTimerDisplay");
 const endBreakBtn = document.getElementById("endBreakBtn");
-const breakMinutesInput = document.getElementById("breakMinutesInput");
+const breakValueInput = document.getElementById("breakValueInput");
+const breakUnitSelect = document.getElementById("breakUnit");
 const resetBtn = document.getElementById("resetLog");
 const logDiv = document.getElementById("log");
 const toggleTrackingBtn = document.getElementById("toggleTrackingBtn");
@@ -565,11 +566,15 @@ if (cancelBreakBtn && breakModal) {
 
 if (confirmBreakBtn) {
   confirmBreakBtn.addEventListener("click", () => {
-    const minutes = parseInt(breakMinutesInput.value, 10);
-    if (Number.isNaN(minutes) || minutes < 1) {
-      alert("Please enter a valid number of minutes");
+    const raw = parseFloat(breakValueInput.value);
+    const unit = (breakUnitSelect && breakUnitSelect.value) || "minutes";
+    if (Number.isNaN(raw) || raw <= 0) {
+      alert("Please enter a break duration greater than 0");
       return;
     }
+
+    let minutes = raw;
+    if (unit === "hours") minutes = Math.round(raw * 60);
 
     breakActive = true;
     breakEndTime = Date.now() + minutes * 60 * 1000;
@@ -660,6 +665,8 @@ if (toggleTrackingBtn) {
         await startSession();
         if (window.api && window.api.startTracking) window.api.startTracking();
       } else {
+        const ok = confirm('Are you sure you want to stop the session?');
+        if (!ok) return;
         await stopSession();
         if (window.api && window.api.stopTracking) window.api.stopTracking();
       }

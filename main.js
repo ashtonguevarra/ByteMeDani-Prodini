@@ -8,7 +8,7 @@
 // - Log user activity to files and send updates to the renderer
 // ============================================
 
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu } = require("electron");
 const path = require("path");
 const { getActiveWindow } = require("./tracker"); // Import window tracking module
 const fs = require("fs");
@@ -172,6 +172,13 @@ ipcMain.on("stop-tracking", () => {
 app.whenReady().then(() => {
   createWindow();
 });
+
+// Remove the default application menu (File/Edit/View...) for a cleaner UI
+try {
+  Menu.setApplicationMenu(null);
+} catch (err) {
+  console.warn("Failed to remove application menu:", err && err.message);
+}
 
 // Quit the application when all windows are closed (except on macOS)
 // On macOS, applications typically remain active until the user explicitly quits
