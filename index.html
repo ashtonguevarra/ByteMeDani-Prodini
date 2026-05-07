@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Activity Tracker Dashboard</title>
+  <title>Prodini - Activity Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="assets/icon.png">
   <link rel="stylesheet" href="style.css">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,12 +11,16 @@
 
 <body>
   <div class="app-container">
+    <!-- ==================== SIDEBAR ==================== -->
     <div class="sidebar" id="sidebar">
       <button class="sidebar-toggle" id="sidebarToggle">◀</button>
 
       <div class="sidebar-content">
         <div class="sidebar-header">
-          <h2>Tracker</h2>  
+          <div class="logo-container">
+            <img src="assets/logo.png" alt="Prodini Logo" class="sidebar-logo">
+            <h2>PRODINI</h2>
+          </div>
         </div>
 
         <nav class="sidebar-nav">
@@ -31,31 +36,35 @@
       </div>
     </div>
 
+    <!-- ==================== MAIN CONTENT ==================== -->
     <div class="main-content">
 
-      <!-- HOME VIEW -->
+      <!-- ==================== HOME VIEW ==================== -->
       <div id="homeView" class="view active">
-      <div class="top-bar">
-        <div class="date-display" id="dateDisplay"></div>
+        <div class="top-bar">
+          <div class="date-display" id="dateDisplay"></div>
+          <div class="top-bar-actions">
+            <button id="toggleTrackingBtn" class="session-btn">Start Session</button>
+            <button id="takeBreakBtn" class="take-break-btn">Take a Break</button>
+            <button id="resetLog" class="reset-log-btn">Reset</button>
+          </div>
+        </div>
 
-        <div class="top-bar-actions">
-      <button id="toggleTrackingBtn" class="session-btn">Start Session</button>
-     <button id="takeBreakBtn" class="take-break-btn">Take a Break</button>
-     <button id="resetLog" class = "reset-log-btn" >Reset</button>
-       </div>
-      </div>
-
+        <!-- Break Modal -->
         <div id="breakModal" class="break-modal">
           <div class="break-modal-content">
-            <h3>Take a Break</h3>
-            <div class="break-input-row">
-              <input type="number" id="breakValueInput" placeholder="0" min="0" max="168" value="0">
-              <select id="breakUnit">
-                <option value="minutes" selected>Minutes</option>
-                <option value="hours">Hours</option>
-              </select>
+            <h3>☕ Take a Break</h3>
+            <div class="break-input-wrapper">
+              <div class="break-number-control">
+                <button class="break-decrement" id="breakDecrement">−</button>
+                <input type="number" id="breakValueInput" value="15" min="1" max="180">
+                <button class="break-increment" id="breakIncrement">+</button>
+              </div>
+              <div class="break-unit-toggle">
+                <button class="break-unit-btn" data-unit="minutes">Minutes</button>
+                <button class="break-unit-btn" data-unit="hours">Hours</button>
+              </div>
             </div>
-
             <div class="break-modal-buttons">
               <button id="confirmBreakBtn" class="confirm-break-btn">Start Break</button>
               <button id="cancelBreakBtn" class="cancel-break-btn">Cancel</button>
@@ -63,61 +72,51 @@
           </div>
         </div>
 
+        <!-- Active Break Bar -->
         <div id="activeBreakBar" class="active-break-bar" style="display: none;">
-          <span>🍵 Break in progress:</span>
+          <span>☕ Break in progress:</span>
           <span id="breakTimerDisplay" class="break-timer-display"></span>
           <button id="endBreakBtn" class="end-break-btn">End Break</button>
         </div>
 
+        <!-- Dashboard Layout -->
         <div class="dashboard-layout">
+          <!-- Activity Log -->
           <div class="log-container">
             <h3>Activity Log</h3>
-
             <div id="log"></div>
           </div>
 
-
-
+          <!-- Right Panel (Chart) -->
           <div class="right-panel">
             <div class="chart-wrapper">
+              <div class="chart-header">
+                <h3>Today's Activity</h3>
+              </div>
               <canvas id="activityChart" width="300" height="300"></canvas>
               <div class="chart-legend" id="chartLegend"></div>
-            </div>
-
-            <div class="summary-section">
-              <h3>Summary</h3>
-
-              <div class="summary-placeholder">
-                <div class="summary-controls">
-                  <select id="summaryPeriod" class="summary-select">
-                    <option value="day">Last 24 hours</option>
-                    <option value="week">Last 7 days</option>
-                    <option value="month">Last 30 days</option>
-                  </select>
-
-                  <button id="generateSummaryBtn" class="summary-btn">Generate Report</button>
-                </div>
-
-                <div class="summary-content">
-                  <p class="summary-message">Summary will appear here</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
 
+        <!-- Weekly Overview -->
         <div class="weekly-summary-section">
           <h3>Weekly Overview</h3>
-          <canvas id="weeklyChart" width="800" height="250"></canvas>
+          <div class="weekly-chart-container">
+            <canvas id="weeklyChart" width="800" height="250"></canvas>
+          </div>
         </div>
 
+        <!-- Monthly Overview -->
         <div class="monthly-summary-section">
           <h3>Monthly Overview</h3>
-          <canvas id="monthlyChart" width="800" height="250"></canvas>
+          <div class="monthly-chart-container">
+            <canvas id="monthlyChart" width="800" height="250"></canvas>
+          </div>
         </div>
-      </div>
+      </div> <!-- END homeView -->
 
-      <!-- HISTORY VIEW -->
+      <!-- ==================== HISTORY VIEW ==================== -->
       <div id="historyView" class="view">
         <div class="top-bar">
           <div>
@@ -126,164 +125,179 @@
           </div>
         </div>
 
+        <!-- Filter Section -->
+        <div class="history-filters">
+          <div class="filter-group">
+            <label>Filter by date:</label>
+            <select id="historyFilterType" class="filter-select">
+              <option value="all">All Sessions</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+
+          <div id="customDateRange" class="custom-date-range" style="display: none;">
+            <input type="date" id="startDate" class="date-input">
+            <span>to</span>
+            <input type="date" id="endDate" class="date-input">
+            <button id="applyDateFilter" class="apply-filter-btn">Apply</button>
+          </div>
+
+          <button id="clearHistoryFilter" class="clear-filter-btn">Clear Filter</button>
+        </div>
+
         <div class="log-container">
           <h3>History Logs</h3>
           <div id="historyLog"></div>
         </div>
-      </div>
+      </div> <!-- END historyView -->
 
-      <!-- WEEKLY VIEW -->
+      <!-- ==================== WEEKLY VIEW ==================== -->
       <div id="weeklyView" class="view">
         <h3>Weekly Details</h3>
-        <canvas id="weeklyChartFull" width="800" height="400"></canvas>
-      </div>
+        <div class="weekly-chart-container">
+          <canvas id="weeklyChartFull" width="800" height="400"></canvas>
+        </div>
+      </div> <!-- END weeklyView -->
 
-      <!-- MONTHLY VIEW -->
+      <!-- ==================== MONTHLY VIEW ==================== -->
       <div id="monthlyView" class="view">
         <h3>Monthly Details</h3>
-        <canvas id="monthlyChartFull" width="800" height="400"></canvas>
-      </div>
+        <div class="monthly-chart-container">
+          <canvas id="monthlyChartFull" width="800" height="400"></canvas>
+        </div>
+      </div> <!-- END monthlyView -->
 
-    </div>
-  </div>
+    </div> <!-- END main-content -->
+  </div> <!-- END app-container -->
 
-  <!-- COLOR MODAL -->
+  <!-- ==================== COLOR CUSTOMIZATION MODAL ==================== -->
   <div id="colorModal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
       <h3>Customize</h3>
 
-      <div class="color-controls">
-        <div class="color-item">
-          <label>Font Size:</label>
-          <div class="font-controls-modal">
-            <button id="fontMinusModal">A-</button>
-            <span id="fontSizeModal">100%</span>
-            <button id="fontPlusModal">A+</button>
+      <div class="modal-scrollable">
+        <!-- Font Size Section -->
+        <div class="color-section">
+          <div class="section-title">Category Colors</div>
+          <div class="color-circles">
+            <div class="color-circle-item">
+              <div class="color-circle" style="background: #00c882;" id="productiveCircle"></div>
+              <span class="color-label">Productive</span>
+              <input type="color" id="productiveColor" class="color-hidden-input" value="#00c882">
+            </div>
+            <div class="color-circle-item">
+              <div class="color-circle" style="background: #ff6b6b;" id="unproductiveCircle"></div>
+              <span class="color-label">Unproductive</span>
+              <input type="color" id="unproductiveColor" class="color-hidden-input" value="#ff6b6b">
+            </div>
+            <div class="color-circle-item">
+              <div class="color-circle" style="background: #ffc83d;" id="restCircle"></div>
+              <span class="color-label">Rest</span>
+              <input type="color" id="restColor" class="color-hidden-input" value="#ffc83d">
+            </div>
           </div>
         </div>
 
-        <div class="color-item">
-          <label>Productive:</label>
-          <input type="color" id="productiveColor" value="#4caf50">
+        <!-- Notification Settings -->
+        <div class="notification-settings-section">
+          <div class="settings-section-title">Unproductive App Notifications</div>
+          <div class="notification-controls">
+            <div class="notification-item">
+              <label for="inactivityTimeout">Notify after unproductive (minutes):</label>
+              <input type="number" id="inactivityTimeout" min="1" max="60" value="1">
+            </div>
+
+            <div class="notification-item">
+              <label for="notificationSoundMode">Sound Mode:</label>
+              <select id="notificationSoundMode">
+                <option value="soft">Soft</option>
+                <option value="normal" selected>Normal</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+
+            <div class="notification-item">
+              <label>
+                <input type="checkbox" id="enableNotifications" checked>
+                <span>Enable Notifications</span>
+              </label>
+            </div>
+
+            <div class="notification-history-panel">
+              <div class="notification-history-row">
+                <span>Total alerts:</span>
+                <strong id="totalAlertCount">0</strong>
+              </div>
+              <div class="notification-history-row">
+                <span>Unproductive alerts:</span>
+                <strong id="unproductiveAlertCount">0</strong>
+              </div>
+              <div class="notification-history-title">Recent unproductive alerts</div>
+              <div id="unproductiveAlertHistory" class="notification-history-list">No alerts yet.</div>
+            </div>
+          </div>
         </div>
 
-        <div class="color-item">
-          <label>Unproductive:</label>
-          <input type="color" id="unproductiveColor" value="#f44336">
-        </div>
+        <!-- Two Column Settings -->
+        <div class="settings-two-column">
+          <!-- Manual Override Card -->
+          <div class="settings-card">
+            <div class="settings-section-title">Manual Classification Override (Session)</div>
+            <div class="manual-override-bar settings-override-panel">
+              <div class="override-current">
+                Override Target: <span id="overrideCurrentApp">No target selected</span>
+              </div>
+              <div class="override-target-row">
+                <select id="overrideTargetApp" class="override-select"></select>
+                <button id="useLastActiveAppBtn" class="override-btn clear">Use Last Active App</button>
+              </div>
+              <div class="override-actions">
+                <button id="markProductiveBtn" class="override-btn productive">Productive</button>
+                <button id="markUnproductiveBtn" class="override-btn unproductive">Unproductive</button>
+                <button id="markRestBtn" class="override-btn rest">Rest</button>
+                <button id="markUnknownBtn" class="override-btn unknown">Unknown</button>
+                <button id="clearCurrentOverrideBtn" class="override-btn clear">Clear Override</button>
+              </div>
+              <div id="overrideStatus" class="override-status">No manual override for this app.</div>
+            </div>
+          </div>
 
-        <div class="color-item">
-          <label>Rest:</label>
-          <input type="color" id="restColor" value="#ff9800">
+          <!-- App Classification Rules Card -->
+          <div class="settings-card">
+            <div class="settings-section-title">App Classification Rules</div>
+            <div class="app-rules-panel">
+              <div class="app-rules-add-row">
+                <input id="appKeywordInput" class="app-rules-input" type="text" placeholder="e.g. linkedin, udemy, discord">
+                <button id="addProductiveKeywordBtn" class="app-rule-add-btn productive">Add Productive</button>
+                <button id="addUnproductiveKeywordBtn" class="app-rule-add-btn unproductive">Add Unproductive</button>
+              </div>
+              <div class="app-rules-header">
+                <span class="app-col-name">App Keyword</span>
+                <span class="app-col-check">Productive</span>
+                <span class="app-col-check">Unproductive</span>
+                <span class="app-col-action">Remove</span>
+              </div>
+              <div id="appRulesList" class="app-rules-list"></div>
+              <div id="appRulesEmpty" class="app-rules-empty">No custom rules yet. Add one above.</div>
+            </div>
+          </div>
         </div>
+      </div> <!-- END modal-scrollable -->
 
-        <div class="color-item">
-          <label>Background:</label>
-          <input type="color" id="bgColor" value="#ffffff">
-        </div>
-
-        <div class="color-item">
-          <label>Text:</label>
-          <input type="color" id="textColor" value="#000000">
-        </div>
+      <!-- Sticky Footer with Apply Button -->
+      <div class="modal-footer">
+        <div id="unsavedIndicator" class="unsaved-indicator" style="display: none;">⚡ Unsaved changes</div>
+        <button id="applyColors" class="apply-btn">Apply Changes</button>
       </div>
+    </div> <!-- END modal-content -->
+  </div> <!-- END colorModal -->
 
-      <!-- NOTIFICATION SETTINGS -->
-      <div class="notification-settings-section">
-        <div class="settings-section-title">Unproductive App Notifications</div>
-        
-        <div class="notification-controls">
-          <div class="notification-item">
-            <label for="inactivityTimeout">Notify after unproductive (minutes):</label>
-            <input type="number" id="inactivityTimeout" min="1" max="60" value="1">
-          </div>
-
-          <div class="notification-item">
-            <label for="notificationSoundMode">Sound Mode:</label>
-            <select id="notificationSoundMode">
-              <option value="soft">Soft</option>
-              <option value="normal" selected>Normal</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-
-          <div class="notification-item">
-            <label>
-              <input type="checkbox" id="enableNotifications" checked>
-              <span>Enable Notifications</span>
-            </label>
-          </div>
-
-          <div class="notification-history-panel">
-            <div class="notification-history-row">
-              <span>Total alerts:</span>
-              <strong id="totalAlertCount">0</strong>
-            </div>
-            <div class="notification-history-row">
-              <span>Unproductive alerts:</span>
-              <strong id="unproductiveAlertCount">0</strong>
-            </div>
-            <div class="notification-history-title">Recent unproductive alerts</div>
-            <div id="unproductiveAlertHistory" class="notification-history-list">No alerts yet.</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="settings-two-column">
-        <div class="settings-card">
-          <div class="settings-section-title">Manual Classification Override (Session)</div>
-
-          <div class="manual-override-bar settings-override-panel">
-            <div class="override-current">
-              Override Target: <span id="overrideCurrentApp">No target selected</span>
-            </div>
-
-            <div class="override-target-row">
-              <select id="overrideTargetApp" class="override-select"></select>
-              <button id="useLastActiveAppBtn" class="override-btn clear">Use Last Active App</button>
-            </div>
-
-            <div class="override-actions">
-              <button id="markProductiveBtn" class="override-btn productive">Productive</button>
-              <button id="markUnproductiveBtn" class="override-btn unproductive">Unproductive</button>
-              <button id="markRestBtn" class="override-btn rest">Rest</button>
-              <button id="markUnknownBtn" class="override-btn unknown">Unknown</button>
-              <button id="clearCurrentOverrideBtn" class="override-btn clear">Clear Override</button>
-            </div>
-
-            <div id="overrideStatus" class="override-status">No manual override for this app.</div>
-          </div>
-        </div>
-
-        <div class="settings-card">
-          <div class="settings-section-title">App Classification Rules</div>
-
-          <div class="app-rules-panel">
-            <div class="app-rules-add-row">
-              <input id="appKeywordInput" class="app-rules-input" type="text" placeholder="e.g. linkedin, udemy, discord">
-              <button id="addProductiveKeywordBtn" class="app-rule-add-btn productive">Add Productive</button>
-              <button id="addUnproductiveKeywordBtn" class="app-rule-add-btn unproductive">Add Unproductive</button>
-            </div>
-
-            <div class="app-rules-header">
-              <span class="app-col-name">App Keyword</span>
-              <span class="app-col-check">Productive</span>
-              <span class="app-col-check">Unproductive</span>
-              <span class="app-col-action">Remove</span>
-            </div>
-
-            <div id="appRulesList" class="app-rules-list"></div>
-            <div id="appRulesEmpty" class="app-rules-empty">No custom rules yet. Add one above.</div>
-          </div>
-        </div>
-      </div>
-
-      <button id="applyColors" class="apply-btn">Apply</button>
-    </div>
-  </div>
-
-  <!-- INACTIVITY NOTIFICATION POPUP -->
+  <!-- ==================== INACTIVITY NOTIFICATION POPUP ==================== -->
   <div id="inactivityNotification" class="inactivity-notification">
     <div class="notification-content">
       <div class="notification-header">
