@@ -1,12 +1,12 @@
 # Prodini – Interstitial Journaling App
 
-## 📌 Overview
+## Overview
 
 Prodini is an interstitial journaling app that helps users become more aware of how they spend their time. It automatically tracks desktop activity and encourages frequent reflection by showing activity logs in a clean interface. Instead of relying only on manual journaling, Prodini connects real computer usage with mindful productivity tracking.
 
 ---
 
-## 🚀 Features
+## Features
 
 * Automatic desktop activity tracking
 * Real-time activity logs display
@@ -16,7 +16,7 @@ Prodini is an interstitial journaling app that helps users become more aware of 
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 * **Frontend:** Electron (HTML, CSS, JavaScript)
 * **Backend:** Flask
@@ -25,13 +25,13 @@ Prodini is an interstitial journaling app that helps users become more aware of 
 
 ---
 
-## ⚙️ Setup Instructions
+## Setup Instructions
 
 ### 1. Clone the repository
 
 ```bash
 git clone https://github.com/ashtonguevarra/Byte-Me-Dani.git
-cd Byte-Me-Dani
+cd Prodini
 ```
 
 ---
@@ -89,34 +89,7 @@ npm start
 
 ---
 
-## 📂 Project Structure
-
-```
-Byte-Me-Dani/
-│── backend/
-│   ├── app.py
-│   ├── venv/
-│
-│── main.js
-│── renderer.js
-│── index.html
-│── package.json
-```
-
----
-
-## 🧪 Testing
-
-* Open the app and verify activity logs appear
-* Check database by visiting:
-
-```
-http://127.0.0.1:5000/logs
-```
-
----
-
-## ⚠️ Common Issues
+## Common Issues
 
 * Missing Flask modules:
 
@@ -136,8 +109,4 @@ npm install electron --save-dev
 
 This project helps users track productivity and analyze their daily digital habits through automatic logging and simple visualization.
 
----
 
-## 👥 Team
-
-Byte Me Dani
