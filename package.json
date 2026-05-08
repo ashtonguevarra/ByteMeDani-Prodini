@@ -5,16 +5,22 @@
   "scripts": {
     "backend:win": "cd backend && venv\\Scripts\\python app.py",
     "backend:linux": "cd backend && ./venv/bin/python app.py",
+
     "electron": "electron .",
-    "start": "npm run start:win",
+
+    "start": "npm run start:linux",
+
     "start:win": "concurrently \"npm run backend:win\" \"wait-on http://127.0.0.1:5000 && npm run electron\"",
+
     "start:linux": "concurrently \"npm run backend:linux\" \"wait-on http://127.0.0.1:5000 && npm run electron\""
   },
+
   "dependencies": {
     "active-win": "^8.2.1",
     "concurrently": "^9.2.1",
     "wait-on": "^9.0.5"
   },
+
   "devDependencies": {
     "electron": "^41.5.0"
   }
