@@ -126,7 +126,7 @@ def get_sessions():
 
 
 @app.route("/sessions/<int:session_id>/logs", methods=["GET"])
-def get_session_logs(session_id):
+def get_session_logsAPI(session_id):
     logs = ActivityLog.query.filter_by(session_id=session_id).order_by(ActivityLog.timestamp.asc()).all()
 
     return jsonify([
@@ -146,9 +146,12 @@ with app.app_context():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
-    sessions = Session.query.order_by(Session.started_at.desc()).all()
+    import os
 
+    port = int(os.environ.get("PORT", 5000))
 
-
-    # Format the sessions as JSON
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=True
+    )

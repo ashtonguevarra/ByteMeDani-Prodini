@@ -58,6 +58,9 @@ const CLASSIFICATION_RULE_STORAGE_KEY = "classificationRulesV1";
 const SESSION_OVERRIDE_STORAGE_KEY = "sessionOverrideRulesV1";
 const NOTIFICATION_SETTINGS_KEY = "notificationSettingsV1";
 
+// Backend URL
+const BACKEND_URL = "https://bytemedani-prodini.onrender.com";
+
 // ============================================
 // GLOBAL VARIABLES
 // ============================================
@@ -486,7 +489,7 @@ function categorizeApp(appName) {
 // ============================================
 async function loadHistoricalData() {
   try {
-    const res = await fetch("http://127.0.0.1:5000/sessions");
+    const res = await fetch(`${BACKEND_URL}/sessions`);
     const sessions = await res.json();
     
     // Reset data
@@ -500,7 +503,7 @@ async function loadHistoricalData() {
       if (!session.ended_at) continue;
       
       // Fetch logs for this session
-      const logsRes = await fetch(`http://127.0.0.1:5000/sessions/${session.id}/logs`);
+      const logsRes = await fetch(`${BACKEND_URL}/sessions/${session.id}/logs`);
       const logs = await logsRes.json();
       
       if (!logs.length) continue;
@@ -695,7 +698,7 @@ function addToLog(windowName, timestamp) {
 // SESSION MANAGEMENT
 // ============================================
 async function startSession() {
-  const res = await fetch("http://127.0.0.1:5000/sessions/start", { method: "POST" });
+  const res = await fetch(`${BACKEND_URL}/sessions/start`, { method: "POST" });
   const data = await res.json();
   currentSessionId = data.session_id;
   localStorage.setItem("currentSessionId", currentSessionId);
@@ -705,7 +708,7 @@ async function startSession() {
 
 async function stopSession() {
   if (!currentSessionId) return;
-  await fetch(`http://127.0.0.1:5000/sessions/${currentSessionId}/stop`, { method: "POST" });
+  await fetch(`${BACKEND_URL}/sessions/${currentSessionId}/stop`, { method: "POST" });
   currentSessionId = null;
   localStorage.removeItem("currentSessionId");
   loadSessionsWithFilter();
@@ -716,7 +719,7 @@ async function saveLogToDatabase(windowTitle) {
   if (!currentSessionId) return;
   const extracted = normalizeWindowActivity(windowTitle);
   if (extracted.isTracker) return;
-  await fetch("http://127.0.0.1:5000/logs", {
+  await fetch(`${BACKEND_URL}/logs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -763,7 +766,7 @@ function clearDashboardActivity() {
 async function endCurrentSessionOnExit() {
   if (currentSessionId) {
     try {
-      await fetch(`http://127.0.0.1:5000/sessions/${currentSessionId}/stop`, { method: "POST" });
+      await fetch(`${BACKEND_URL}/sessions/${currentSessionId}/stop`, { method: "POST" });
       console.log("Session ended on app exit");
     } catch (err) {
       console.error("Failed to end session on exit:", err);
@@ -945,7 +948,7 @@ async function loadSessionLogs(sessionId) {
   if (!historyLog) return;
 
   try {
-    const res = await fetch(`http://127.0.0.1:5000/sessions/${sessionId}/logs`);
+    const res = await fetch(`${BACKEND_URL}/sessions/${sessionId}/logs`);
     const logs = await res.json();
     historyLog.innerHTML = "";
 
@@ -1049,7 +1052,7 @@ async function loadSessionsWithFilter() {
   const historyLog = getEl("historyLog");
   if (!historyLog) return;
   try {
-    const res = await fetch("http://127.0.0.1:5000/sessions");
+    const res = await fetch(`${BACKEND_URL}/sessions`);
     const sessions = await res.json();
     allSessions = sessions;
     let filteredSessions = [...sessions];
