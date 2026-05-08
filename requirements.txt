@@ -89,7 +89,7 @@ webencodings==0.5.1
 wheel==0.47.0
 wxPython==4.2.5
 zstandard==0.25.0
-Flask
-Flask-Cors
-Flask-SQLAlchemy
+Flask==3.1.3
+Flask-Cors==6.0.2
+Flask-SQLAlchemy==3.1.1
 gunicorn==23.0.0
